@@ -21,6 +21,7 @@ use Endroid\QrCode\Writer\PdfWriter as QrPdfWriter;
 use Endroid\QrCode\Writer\SvgWriter as QrSvgWriter;
 use Endroid\QrCode\Color\Color as QrColor;
 use Endroid\QrCode\QrCode;
+use DateTime;
 
 /**
  * Knihovna pro generování QR plateb v PHP.
@@ -65,7 +66,7 @@ class QRInvoice
 	/**
 	 * @var array klíče QR Platby
 	 */
-	private $spd_keys = [
+	private array $spd_keys = [
 		'ACC' => null,
 		// Max. 46 - znaků IBAN, BIC Identifikace protistrany !povinny
 		'ALT-ACC' => null,
@@ -107,7 +108,7 @@ class QRInvoice
 	/**
 	 * @var array klíče QR Faktury
 	 */
-	private $sid_keys = [
+	private array $sid_keys = [
 		'ID' => null,
 		// Max. 40 znaků - Jednoznačné označení dokladu
 		'DD' => null,
@@ -173,18 +174,14 @@ class QRInvoice
 	/**
 	 * Přepínač, zda se má generovat pouze QR Faktura
 	 */
-	private $isOnlyInvoice = false;
+	private bool $isOnlyInvoice = false;
 
 	/**
 	 * Konstruktor nové platby.
 	 *
-	 * @param null $account
-	 * @param null $amount
-	 * @param null $variable
-	 * @param null $currency
 	 * @throws \InvalidArgumentException
 	 */
-	public function __construct($account = null, $amount = null, $variable = null, $currency = null)
+	public function __construct(?string $account = null, int | float | null $amount = null, ?string $variable = null, ?string $currency = null)
 	{
 		if ($account) {
 			$this->setAccount($account);
@@ -210,19 +207,15 @@ class QRInvoice
 	 * @return QRInvoice
 	 * @throws \InvalidArgumentException
 	 */
-	public static function create($account = null, $amount = null, $variable = null)
+	public static function create(?string $account = null, int | float | null $amount = null, ?string $variable = null): QRInvoice
 	{
 		return new self($account, $amount, $variable);
 	}
 
 	/**
 	 * Nastavení čísla účtu ve formátu 12-3456789012/0100.
-	 *
-	 * @param $account
-	 *
-	 * @return $this
 	 */
-	public function setAccount($account)
+	public function setAccount(string $account): QRInvoice
 	{
 		$this->spd_keys['ACC'] = $this->sid_keys['ACC'] = self::accountToIban($account);
 
@@ -231,12 +224,8 @@ class QRInvoice
 
 	/**
 	 * Nastavení IBAN (+SWIFT/BIC) čísla účtu
-	 *
-	 * @param $iban
-	 *
-	 * @return $this
 	 */
-	public function setIban($iban)
+	public function setIban(string $iban): QRInvoice
 	{
 		$this->spd_keys['ACC'] = $this->sid_keys['ACC'] = $iban;
 
@@ -245,12 +234,8 @@ class QRInvoice
 
 	/**
 	 * Nastavení částky.
-	 *
-	 * @param $amount
-	 *
-	 * @return $this
 	 */
-	public function setAmount($amount)
+	public function setAmount(int | float $amount): QRInvoice
 	{
 		$this->spd_keys['AM'] = $this->sid_keys['AM'] = sprintf('%.2f', $amount);
 
@@ -259,12 +244,8 @@ class QRInvoice
 
 	/**
 	 * Nastavení variabilního symbolu.
-	 *
-	 * @param $vs
-	 *
-	 * @return $this
 	 */
-	public function setVariableSymbol($vs)
+	public function setVariableSymbol(string $vs): QRInvoice
 	{
 		$this->spd_keys['X-VS'] = $this->sid_keys['VS'] = $vs;
 
@@ -273,12 +254,8 @@ class QRInvoice
 
 	/**
 	 * Nastavení konstatního symbolu.
-	 *
-	 * @param $ks
-	 *
-	 * @return $this
 	 */
-	public function setConstantSymbol($ks)
+	public function setConstantSymbol(string $ks): QRInvoice
 	{
 		$this->spd_keys['X-KS'] = $ks;
 
@@ -288,13 +265,9 @@ class QRInvoice
 	/**
 	 * Nastavení specifického symbolu.
 	 *
-	 * @param $ss
-	 *
 	 * @throws QRInvoiceException
-	 *
-	 * @return $this
 	 */
-	public function setSpecificSymbol($ss)
+	public function setSpecificSymbol(string $ss): QRInvoice
 	{
 		if (mb_strlen($ss) > 10) {
 			throw new QRInvoiceException('Specific symbol is longer than 10 characters');
@@ -306,12 +279,8 @@ class QRInvoice
 
 	/**
 	 * Nastavení zprávy pro příjemce. Z řetězce bude odstraněna diaktirika.
-	 *
-	 * @param $msg
-	 *
-	 * @return $this
 	 */
-	public function setMessage($msg)
+	public function setMessage(string $msg): QRInvoice
 	{
 		$this->spd_keys['MSG'] = $this->sid_keys['MSG'] = mb_substr($this->stripDiacritics($msg), 0, 60);
 
@@ -320,12 +289,8 @@ class QRInvoice
 
 	/**
 	 * Nastavení jména příjemce. Z řetězce bude odstraněna diaktirika.
-	 *
-	 * @param $name
-	 *
-	 * @return $this
 	 */
-	public function setRecipientName($name)
+	public function setRecipientName(string $name): QRInvoice
 	{
 		$this->spd_keys['RN'] = mb_substr($this->stripDiacritics($name), 0, 35);
 
@@ -334,12 +299,8 @@ class QRInvoice
 
 	/**
 	 * Nastavení data úhrady.
-	 *
-	 * @param \DateTime $date
-	 *
-	 * @return $this
 	 */
-	public function setDueDate(\DateTime $date)
+	public function setDueDate(DateTime $date): QrInvoice
 	{
 		$this->spd_keys['DT'] = $this->sid_keys['DT'] = $date->format('Ymd');
 
@@ -347,12 +308,9 @@ class QRInvoice
 	}
 
 	/**
-	 * @param $cc
-	 *
-	 * @return $this
 	 * @throws \InvalidArgumentException
 	 */
-	public function setCurrency($cc)
+	public function setCurrency(string $cc): QRInvoice
 	{
 		if (!in_array($cc, self::$currencies, true)) {
 			throw new \InvalidArgumentException(sprintf('Currency %s is not supported.', $cc));
@@ -365,12 +323,8 @@ class QRInvoice
 
 	/**
 	 * Přepínač, zda se má generovat pouze QR Faktura
-	 *
-	 * @param bool $isOnlyInvoice
-	 *
-	 * @return $this
 	 */
-	public function setIsOnlyInvoice(bool $isOnlyInvoice)
+	public function setIsOnlyInvoice(bool $isOnlyInvoice): QRInvoice
 	{
 		$this->isOnlyInvoice = $isOnlyInvoice;
 
@@ -380,12 +334,9 @@ class QRInvoice
 	/**
 	 * Nastavení ID faktury
 	 *
-	 * @param string $id
-	 *
-	 * @return $this
 	 * @throws \InvalidArgumentException
 	 */
-	public function setInvoiceId(string $id)
+	public function setInvoiceId(string $id): QRInvoice
 	{
 		if (mb_strlen($id) > 40) {
 			throw new QRInvoiceException('Invoice id is longer than 40 characters');
@@ -398,12 +349,8 @@ class QRInvoice
 
 	/**
 	 * Nastavení data vydání faktury
-	 *
-	 * @param \DateTime $date
-	 *
-	 * @return $this
 	 */
-	public function setInvoiceDate(\DateTime $date)
+	public function setInvoiceDate(DateTime $date): QrInvoice
 	{
 		$this->sid_keys['DD'] = $date->format('Ymd');
 
@@ -412,14 +359,10 @@ class QRInvoice
 
 	/**
 	 * Nastavení typu daňového plnění
-	 *
-	 * @param int $tp
-	 *
-	 * @return $this
 	 */
-	public function setTaxPerformance(int $tp)
+	public function setTaxPerformance(int $tp): QRInvoice
 	{
-		if ($tp!==0 && $tp!==1 && $tp!==2) {
+		if ($tp !== 0 && $tp !== 1 && $tp !== 2) {
 			throw new QRInvoiceException('Unknown tax performance ID');
 		}
 
@@ -430,14 +373,10 @@ class QRInvoice
 
 	/**
 	 * Nastavení identifikace typu dokladu
-	 *
-	 * @param int $td
-	 *
-	 * @return $this
 	 */
-	public function setInvoiceDocumentType(int $td)
+	public function setInvoiceDocumentType(int $td): QRInvoice
 	{
-		if (($td<0 || $td>5) && $td!==9) {
+		if (($td < 0 || $td > 5) && $td !== 9) {
 			throw new QRInvoiceException('Unknown invoice document type ID');
 		}
 
@@ -448,12 +387,8 @@ class QRInvoice
 
 	/**
 	 * Nastavení příznaku, který rozlišuje, zda faktura obsahuje zúčtování záloh
-	 *
-	 * @param bool $sa
-	 *
-	 * @return $this
 	 */
-	public function setInvoiceIncludingDeposit(bool $sa)
+	public function setInvoiceIncludingDeposit(bool $sa): QRInvoice
 	{
 		$this->sid_keys['SA'] = (int)$sa;
 
@@ -463,12 +398,9 @@ class QRInvoice
 	/**
 	 * Nastavení čísla (označení) objednávky, k níž se vztahuje tento účetní doklad
 	 *
-	 * @param string $on
-	 *
-	 * @return $this
 	 * @throws \InvalidArgumentException
 	 */
-	public function setInvoiceRelatedId(string $on)
+	public function setInvoiceRelatedId(string $on): QRInvoice
 	{
 		if (mb_strlen($on) > 20) {
 			throw new QRInvoiceException('Invoice related id is longer than 20 characters');
@@ -482,12 +414,9 @@ class QRInvoice
 	/**
 	 * Nastavení DIČ výstavce
 	 *
-	 * @param string $vii
-	 *
-	 * @return $this
 	 * @throws \InvalidArgumentException
 	 */
-	public function setCompanyTaxId(string $vii)
+	public function setCompanyTaxId(string $vii): QRInvoice
 	{
 		if (mb_strlen($vii) > 14) {
 			throw new QRInvoiceException('Tax identification number of invoicing subject is longer than 14 characters');
@@ -501,12 +430,9 @@ class QRInvoice
 	/**
 	 * Nastavení IČO výstavce
 	 *
-	 * @param string $ini
-	 *
-	 * @return $this
 	 * @throws \InvalidArgumentException
 	 */
-	public function setCompanyRegistrationId(string $ini)
+	public function setCompanyRegistrationId(string $ini): QRInvoice
 	{
 		if (mb_strlen($ini) > 8) {
 			throw new QRInvoiceException('Company registration number of invoicing subject is longer than 8 characters');
@@ -520,12 +446,9 @@ class QRInvoice
 	/**
 	 * Nastavení DIČ příjemce
 	 *
-	 * @param string $vir
-	 *
-	 * @return $this
 	 * @throws \InvalidArgumentException
 	 */
-	public function setInvoiceSubjectTaxId(string $vir)
+	public function setInvoiceSubjectTaxId(string $vir): QRInvoice
 	{
 		if (mb_strlen($vir) > 14) {
 			throw new QRInvoiceException('Tax identification number of invoiced subject is longer than 14 characters');
@@ -539,12 +462,9 @@ class QRInvoice
 	/**
 	 * Nastavení IČO příjemce
 	 *
-	 * @param string $inr
-	 *
-	 * @return $this
 	 * @throws \InvalidArgumentException
 	 */
-	public function setInvoiceSubjectRegistrationId(string $inr)
+	public function setInvoiceSubjectRegistrationId(string $inr): QRInvoice
 	{
 		if (mb_strlen($inr) > 8) {
 			throw new QRInvoiceException('Company registration number of invoiced subject is longer than 8 characters');
@@ -557,12 +477,8 @@ class QRInvoice
 
 	/**
 	 * Nastavení data uskutečnění zdanitelného plnění
-	 *
-	 * @param string $date
-	 *
-	 * @return $this
 	 */
-	public function setTaxDate(\DateTime $date)
+	public function setTaxDate(DateTime $date): QrInvoice
 	{
 		$this->sid_keys['DUZP'] = $date->format('Ymd');
 
@@ -571,12 +487,8 @@ class QRInvoice
 
 	/**
 	 * Nastavení data povinnosti přiznat daň
-	 *
-	 * @param string $date
-	 *
-	 * @return $this
 	 */
-	public function setTaxReportDate(\DateTime $date)
+	public function setTaxReportDate(DateTime $date): QRInvoice
 	{
 		$this->sid_keys['DPPD'] = $date->format('Ymd');
 
@@ -586,15 +498,11 @@ class QRInvoice
 	/**
 	 * Nastavení částky základu daně v CZK včetně haléřového vyrovnání
 	 *
-	 * @param float $amount
-	 * @param int $taxLevelId
-	 *
-	 * @return $this
 	 * @throws \InvalidArgumentException
 	 */
-	public function setTaxBase(float $amount, int $taxLevelId)
+	public function setTaxBase(float $amount, int $taxLevelId): QRInvoice
 	{
-		if ($taxLevelId<0 || $taxLevelId>2) {
+		if ($taxLevelId < 0 || $taxLevelId > 2) {
 			throw new QRInvoiceException('Unknown tax level ID');
 		}
 
@@ -606,15 +514,11 @@ class QRInvoice
 	/**
 	 * Nastavení částky daně v CZK včetně haléřového vyrovnání
 	 *
-	 * @param float $amount
-	 * @param int $taxLevelId
-	 *
-	 * @return $this
 	 * @throws \InvalidArgumentException
 	 */
-	public function setTaxAmount(float $amount, int $taxLevelId)
+	public function setTaxAmount(float $amount, int $taxLevelId): QRInvoice
 	{
-		if ($taxLevelId<0 || $taxLevelId>2) {
+		if ($taxLevelId < 0 || $taxLevelId > 2) {
 			throw new QRInvoiceException('Unknown tax level ID');
 		}
 
@@ -625,12 +529,8 @@ class QRInvoice
 
 	/**
 	 * Nastavení částky osvobozených plnění, plnění mimo předmět DPH, plnění neplátců DPH v CZK včetně haléřového vyrovnání
-	 *
-	 * @param float $amount
-	 *
-	 * @return $this
 	 */
-	public function setNoTaxAmount(float $amount)
+	public function setNoTaxAmount(float $amount): QRInvoice
 	{
 		$this->sid_keys['NTB'] = sprintf('%.2f', $amount);
 
@@ -639,12 +539,8 @@ class QRInvoice
 
 	/**
 	 * Nastavení směnného kurzu mezi CZK a měnou celkové částky
-	 *
-	 * @param float $currencyRate
-	 *
-	 * @return $this
 	 */
-	public function setCurrencyRate(float $currencyRate)
+	public function setCurrencyRate(float $currencyRate): QRInvoice
 	{
 		$this->sid_keys['FX'] = sprintf('%.3f', $currencyRate);
 
@@ -654,12 +550,9 @@ class QRInvoice
 	/**
 	 * Nastavení označení účetního software, ve kterém byl řetězec QR Faktury (faktura) vytvořen
 	 *
-	 * @param string $taxSoftware
-	 *
-	 * @return $this
 	 * @throws \InvalidArgumentException
 	 */
-	public function setTaxSoftware(string $taxSoftware)
+	public function setTaxSoftware(string $taxSoftware): QRInvoice
 	{
 		if (mb_strlen($taxSoftware) > 30) {
 			throw new QRInvoiceException('Tax software name is longer than 30 characters');
@@ -672,15 +565,13 @@ class QRInvoice
 
 	/**
 	 * Metoda vrátí QR Platbu nebo Fakturu s integrovanou QR Platbou jako textový řetězec.
-	 *
-	 * @return string
 	 */
-	public function __toString()
+	public function __toString(): string
 	{
 		$encoded_string = '';
 
 		// QR Platba
-		if ($this->isOnlyInvoice===false) {
+		if ($this->isOnlyInvoice === false) {
 			$chunks = ['SPD', self::SPD_VERSION];
 			foreach ($this->spd_keys as $key => $value) {
 				if (null === $value) {
@@ -697,9 +588,9 @@ class QRInvoice
 			foreach ($this->sid_keys as $key => $value) {
 				if (
 					null === $value ||
-					($this->isOnlyInvoice===false && (
-						(isset($this->spd_keys[$key]) && $this->spd_keys[$key]===$value) ||
-						(isset($this->spd_keys['X-'.$key]) && $this->spd_keys['X-'.$key]===$value)
+					($this->isOnlyInvoice === false && (
+						(isset($this->spd_keys[$key]) && $this->spd_keys[$key] === $value) ||
+						(isset($this->spd_keys['X-'.$key]) && $this->spd_keys['X-'.$key] === $value)
 					))
 				) {
 					continue;
@@ -707,7 +598,7 @@ class QRInvoice
 				$chunks[] = $key.':'.$value;
 			}
 
-			if ($this->isOnlyInvoice===false) {
+			if ($this->isOnlyInvoice === false) {
 				$encoded_string .= '*X-INV:'.implode('%2A', $chunks).'*';
 			} else {
 				$encoded_string .= implode('*', $chunks).'*';
@@ -719,13 +610,8 @@ class QRInvoice
 
 	/**
 	 * Metoda vrátí QR kód jako HTML tag, případně jako data-uri.
-	 *
-	 * @param bool $htmlTag
-	 * @param int  $size
-	 *
-	 * @return string
 	 */
-	public function getQRCodeImage($htmlTag = true, $size = 300, $margin = 10)
+	public function getQRCodeImage(bool $htmlTag = true, int $size = 300, int $margin = 10): string
 	{
 		$qrCode = $this->getQRCodeInstance($size, $margin);
 		$writer = new QrPngWriter();
@@ -739,14 +625,9 @@ class QRInvoice
 	/**
 	 * Uložení QR kódu do souboru.
 	 *
-	 * @param null|string $filename File name of the QR Code
-	 * @param null|string $format Format of the file (png, jpeg, jpg, gif, wbmp)
-	 * @param int $size
-	 *
-	 * @return QRInvoice
 	 * @throws \Endroid\QrCode\Exception\UnsupportedExtensionException
 	 */
-	public function saveQRCodeImage($filename = null, $format = 'png', $size = 300, $margin = 10)
+	public function saveQRCodeImage(?string $filename = null, string $format = 'png', int $size = 300, int $margin = 10): QRInvoice
 	{
 		$qrCode = $this->getQRCodeInstance($size, $margin);
 
@@ -778,31 +659,25 @@ class QRInvoice
 
 	/**
 	 * Instance třídy QrCode pro libovolné úpravy (barevnost, atd.).
-	 *
-	 * @param int $size
-	 *
-	 * @return QrCode
 	 */
-	public function getQRCodeInstance($size = 300, $margin = 10)
+	public function getQRCodeInstance(int $size = 300, int $margin = 10): QrCode
 	{
-		return QrCode::create((string) $this)
-			->setSize($size - ($margin * 2))
-			->setEncoding(new QrEncoding('UTF-8'))
-			->setErrorCorrectionLevel(QrErrorCorrectionLevel::Medium)
-			->setMargin($margin)
-			->setRoundBlockSizeMode(QrRoundBlockSizeMode::Enlarge)
-			->setForegroundColor(new QrColor(0, 0, 0, 0))
-			->setBackgroundColor(new QrColor(255, 255, 255, 0));
+		return new QrCode(
+			data: (string) $this,
+			size: $size - ($margin * 2),
+			encoding: new QrEncoding('UTF-8'),
+			errorCorrectionLevel: QrErrorCorrectionLevel::Medium,
+			margin: $margin,
+			roundBlockSizeMode: QrRoundBlockSizeMode::Enlarge,
+			foregroundColor: new QrColor(0, 0, 0, 0),
+			backgroundColor: new QrColor(255, 255, 255, 0),
+		);
 	}
 
 	/**
 	 * Převedení čísla účtu na formát IBAN.
-	 *
-	 * @param $accountNumber
-	 *
-	 * @return string
 	 */
-	public static function accountToIban($accountNumber)
+	public static function accountToIban(string $accountNumber): string
 	{
 		$accountNumber = explode('/', $accountNumber);
 		$bank = $accountNumber[1];
@@ -836,12 +711,8 @@ class QRInvoice
 
 	/**
 	 * Odstranění diaktitiky.
-	 *
-	 * @param $string
-	 *
-	 * @return mixed
 	 */
-	private function stripDiacritics($string)
+	private function stripDiacritics(string $string): string
 	{
 		$string = str_replace(
 			[
