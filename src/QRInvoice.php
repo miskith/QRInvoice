@@ -24,6 +24,11 @@ use Endroid\QrCode\Writer\PdfWriter as QrPdfWriter;
 use Endroid\QrCode\Writer\PngWriter as QrPngWriter;
 use Endroid\QrCode\Writer\SvgWriter as QrSvgWriter;
 use Endroid\QrCode\Writer\WebPWriter as QrWebPWriter;
+use miskith\QRInvoice\Enum\Currency;
+use miskith\QRInvoice\Enum\Format;
+use miskith\QRInvoice\Enum\InvoiceDocumentType;
+use miskith\QRInvoice\Enum\PaymentType;
+use miskith\QRInvoice\Enum\TaxPerformance;
 
 /**
  * Knihovna pro generování QR plateb v PHP.
@@ -352,7 +357,7 @@ class QRInvoice
 	 */
 	public function setInstantPayment(bool $instant = true): QRInvoice
 	{
-		$this->spd_keys['PT'] = $instant ? 'IP' : null;
+		$this->spd_keys['PT'] = $instant ? PaymentType::Instant->value : null;
 
 		return $this;
 	}
@@ -360,15 +365,21 @@ class QRInvoice
 	/**
 	 * Nastavení typu platby (PT).
 	 *
+	 * @param PaymentType|string|null $type Doporučeno předávat PaymentType enum. Předávání textového řetězce je deprecated a v budoucí verzi bude odstraněno.
 	 * @throws QRInvoiceException
 	 */
-	public function setPaymentType(?string $type): QRInvoice
+	public function setPaymentType(PaymentType | string | null $type): QRInvoice
 	{
-		if ($type !== null && mb_strlen($type) > 3) {
+		if (is_string($type)) {
+			@trigger_error('Passing string to setPaymentType() is deprecated, use miskith\QRInvoice\Enum\PaymentType enum instead.', E_USER_DEPRECATED);
+		}
+
+		$typeString = $type instanceof PaymentType ? $type->value : $type;
+		if ($typeString !== null && mb_strlen($typeString) > 3) {
 			throw new QRInvoiceException('Payment type (PT) cannot exceed 3 characters.');
 		}
 
-		$this->spd_keys['PT'] = $type;
+		$this->spd_keys['PT'] = $typeString;
 
 		return $this;
 	}
@@ -420,15 +431,24 @@ class QRInvoice
 	}
 
 	/**
+	 * Nastavení měny.
+	 *
+	 * @param Currency|string $cc Doporučeno předávat Currency enum. Předávání textového řetězce je deprecated a v budoucí verzi bude odstraněno.
 	 * @throws \InvalidArgumentException
 	 */
-	public function setCurrency(string $cc): QRInvoice
+	public function setCurrency(Currency | string $cc): QRInvoice
 	{
-		if (!in_array($cc, self::$currencies, true)) {
-			throw new \InvalidArgumentException(sprintf('Currency %s is not supported.', $cc));
+		if (is_string($cc)) {
+			@trigger_error('Passing string to setCurrency() is deprecated, use miskith\QRInvoice\Enum\Currency enum instead.', E_USER_DEPRECATED);
 		}
 
-		$this->spd_keys['CC'] = $this->sid_keys['CC'] = $cc;
+		$currencyCode = $cc instanceof Currency ? $cc->value : $cc;
+
+		if (Currency::tryFrom($currencyCode) === null) {
+			throw new \InvalidArgumentException(sprintf('Currency %s is not supported.', $currencyCode));
+		}
+
+		$this->spd_keys['CC'] = $this->sid_keys['CC'] = $currencyCode;
 
 		return $this;
 	}
@@ -471,28 +491,42 @@ class QRInvoice
 
 	/**
 	 * Nastavení typu daňového plnění
+	 *
+	 * @param TaxPerformance|int $tp Doporučeno předávat TaxPerformance enum. Předávání celého čísla je deprecated a v budoucí verzi bude odstraněno.
 	 */
-	public function setTaxPerformance(int $tp): QRInvoice
+	public function setTaxPerformance(TaxPerformance | int $tp): QRInvoice
 	{
-		if ($tp !== 0 && $tp !== 1 && $tp !== 2) {
+		if (is_int($tp)) {
+			@trigger_error('Passing int to setTaxPerformance() is deprecated, use miskith\QRInvoice\Enum\TaxPerformance enum instead.', E_USER_DEPRECATED);
+		}
+
+		$tpValue = $tp instanceof TaxPerformance ? $tp->value : $tp;
+		if (TaxPerformance::tryFrom($tpValue) === null) {
 			throw new QRInvoiceException('Unknown tax performance ID');
 		}
 
-		$this->sid_keys['TP'] = $tp;
+		$this->sid_keys['TP'] = $tpValue;
 
 		return $this;
 	}
 
 	/**
 	 * Nastavení identifikace typu dokladu
+	 *
+	 * @param InvoiceDocumentType|int $td Doporučeno předávat InvoiceDocumentType enum. Předávání celého čísla je deprecated a v budoucí verzi bude odstraněno.
 	 */
-	public function setInvoiceDocumentType(int $td): QRInvoice
+	public function setInvoiceDocumentType(InvoiceDocumentType | int $td): QRInvoice
 	{
-		if (($td < 0 || $td > 5) && $td !== 9) {
+		if (is_int($td)) {
+			@trigger_error('Passing int to setInvoiceDocumentType() is deprecated, use miskith\QRInvoice\Enum\InvoiceDocumentType enum instead.', E_USER_DEPRECATED);
+		}
+
+		$tdValue = $td instanceof InvoiceDocumentType ? $td->value : $td;
+		if (InvoiceDocumentType::tryFrom($tdValue) === null) {
 			throw new QRInvoiceException('Unknown invoice document type ID');
 		}
 
-		$this->sid_keys['TD'] = $td;
+		$this->sid_keys['TD'] = $tdValue;
 
 		return $this;
 	}
@@ -873,19 +907,29 @@ class QRInvoice
 	/**
 	 * Uložení QR kódu do souboru.
 	 *
+	 * @param string|null $filename Cesta k cílovému souboru
+	 * @param Format|string $format Doporučeno předávat Format enum. Předávání textového řetězce je deprecated a v budoucí verzi bude odstraněno.
+	 * @param int $size Velikost v px (výchozí: 300)
+	 * @param int $margin Okraj v px (výchozí: 10)
 	 * @throws \Endroid\QrCode\Exception\UnsupportedExtensionException
 	 * @throws QRInvoiceException
 	 */
-	public function saveQRCodeImage(?string $filename = null, string $format = 'png', int $size = 300, int $margin = 10): QRInvoice
+	public function saveQRCodeImage(?string $filename = null, Format | string $format = Format::Png, int $size = 300, int $margin = 10): QRInvoice
 	{
+		if (is_string($format)) {
+			@trigger_error('Passing string to saveQRCodeImage() is deprecated, use miskith\QRInvoice\Enum\Format enum instead.', E_USER_DEPRECATED);
+		}
+
 		$qrCode = $this->getQRCodeInstance($size, $margin);
 
-		$writer = match ($format) {
+		$formatStr = $format instanceof Format ? $format->value : strtolower($format);
+
+		$writer = match ($formatStr) {
 			'png' => new QrPngWriter(),
 			'svg' => new QrSvgWriter(),
 			'pdf' => new QrPdfWriter(),
 			'eps' => new QrEpsWriter(),
-			'bin' => new QrBinaryWriter(),
+			'bin', 'binary' => new QrBinaryWriter(),
 			'webp' => new QrWebPWriter(),
 			'gif' => new QrGifWriter(),
 			default => throw new QRInvoiceException('Unknown file format'),

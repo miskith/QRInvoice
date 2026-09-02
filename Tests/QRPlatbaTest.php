@@ -10,6 +10,9 @@
  */
 
 use Endroid\QrCode\QrCode;
+use miskith\QRInvoice\Enum\Currency;
+use miskith\QRInvoice\Enum\Format;
+use miskith\QRInvoice\Enum\PaymentType;
 use miskith\QRInvoice\QRInvoice;
 use miskith\QRInvoice\QRInvoiceException;
 use PHPUnit\Framework\TestCase;
@@ -385,5 +388,51 @@ class QRPlatbaTest extends TestCase
 		$this->expectExceptionMessage('Repeat period (X-PER) must be between 1 and 30 days.');
 
 		new QRInvoice()->setRepeat(31);
+	}
+
+	public function testCurrencyEnum(): void
+	{
+		$qr = QRInvoice::create('12-3456789012/0100', '100.00')
+			->setCurrency(Currency::EUR);
+
+		$this->assertStringContainsString('*CC:EUR', $qr->__toString());
+
+		$qr->setCurrency(Currency::CZK);
+		$this->assertStringContainsString('*CC:CZK', $qr->__toString());
+	}
+
+	public function testPaymentTypeEnum(): void
+	{
+		$qr = QRInvoice::create('12-3456789012/0100', '100.00')
+			->setPaymentType(PaymentType::Instant);
+
+		$this->assertStringContainsString('*PT:IP', $qr->__toString());
+
+		$qr->setPaymentType(PaymentType::Standard);
+		$this->assertStringContainsString('*PT:STD', $qr->__toString());
+	}
+
+	public function testSaveQRCodeImageWithFormatEnum(): void
+	{
+		$qr = QRInvoice::create('12-3456789012/0100', '100.00');
+		$tmpPng = tempnam(sys_get_temp_dir(), 'qr_') . '.png';
+		$tmpSvg = tempnam(sys_get_temp_dir(), 'qr_') . '.svg';
+
+		try {
+			$qr->saveQRCodeImage($tmpPng, Format::Png, 100, 5);
+			$this->assertFileExists($tmpPng);
+			$this->assertGreaterThan(0, filesize($tmpPng));
+
+			$qr->saveQRCodeImage($tmpSvg, Format::Svg, 100, 5);
+			$this->assertFileExists($tmpSvg);
+			$this->assertStringContainsString('<svg', file_get_contents($tmpSvg));
+		} finally {
+			if (file_exists($tmpPng)) {
+				unlink($tmpPng);
+			}
+			if (file_exists($tmpSvg)) {
+				unlink($tmpSvg);
+			}
+		}
 	}
 }

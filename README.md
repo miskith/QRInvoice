@@ -12,6 +12,7 @@ QR platba zjednodušuje koncovému uživateli provedení příkazu k úhradě v 
 ### Vlastnosti knihovny:
 
 - Generování standardního řetězce **SPAYD 1.0** i integrované či samostatné **QR Faktury** (**SID 1.0**).
+- Plná typovost s podporou **PHP 8.4 Enumů** (`Format`, `Currency`, `PaymentType`, `InvoiceDocumentType`, `TaxPerformance`).
 - Podpora pro **okamžité platby** (`PT:IP`).
 - Podpora pro **alternativní účty příjemce** (`ALT-ACC`).
 - Podpora pro **notifikace o platbě** na e-mail (`NT:E`) i SMS (`NT:P`).
@@ -22,7 +23,12 @@ QR platba zjednodušuje koncovému uživateli provedení příkazu k úhradě v 
 - Uložení do souboru v široké škále formátů: **PNG, SVG, PDF, EPS, WebP, GIF, binární** (`$qrInvoice->saveQRCodeImage()`).
 - Získání instance objektu [Endroid\QrCode\QrCode](https://github.com/endroid/qr-code) pro pokročilé úpravy (`$qrInvoice->getQRCodeInstance()`).
 - Podpora pro české bankovní účty (automatický převod na IBAN) i přímé zadání IBAN/BIC.
-- Podpora pro měnu CZK i ostatní světové měny dle ISO 4217 pomocí `setCurrency($currency)`.
+- Podpora pro měnu CZK i ostatní světové měny dle ISO 4217 pomocí `setCurrency(Currency::CZK)`.
+
+> [!TIP]
+> **Doporučení pro typovost (PHP 8.4 Enums):**  
+> V PHP 8.4 důrazně doporučujeme používat nativní Enumy (`Format`, `Currency`, `PaymentType`, `InvoiceDocumentType`, `TaxPerformance`).  
+> Předávání skalárních řetězců a celých čísel (např. `'png'`, `'CZK'`, `0`) je z důvodu zachování zpětné kompatibility stále podporováno, ale je označeno jako **deprecated** a v budoucí verzi knihovny bude odstraněno.
 
 QR Platbu dnes podporují prakticky všechny tuzemské banky (např. Air Bank, Česká spořitelna, ČSOB, Fio banka, Komerční banka, mBank, MONETA Money Bank, Raiffeisenbank, UniCredit Bank, Banka Creditas a další).
 
@@ -45,6 +51,7 @@ composer require miskith/qr-platba
 
 require __DIR__ . '/vendor/autoload.php';
 
+use miskith\QRInvoice\Enum\Currency;
 use miskith\QRInvoice\QRInvoice;
 
 $qrInvoice = new QRInvoice()
@@ -54,9 +61,9 @@ $qrInvoice = new QRInvoice()
     ->setConstantSymbol('0308')
     ->setSpecificSymbol('1234')
     ->setMessage('Toto je první QR platba.')
-    ->setCurrency('CZK') // Výchozí je CZK, lze zadat jakýkoli kód ISO 4217
+    ->setCurrency(Currency::CZK) // Doporučeno použít Enum Currency::CZK
     ->setDueDate(new \DateTime('+14 days'))
-    ->setCRC32(true);    // Volitelný kontrolní součet CRC32 dle ČBA
+    ->setCRC32(true);           // Volitelný kontrolní součet CRC32 dle ČBA
 
 echo $qrInvoice->getQRCodeImage(); // Zobrazí <img> tag s QR kódem
 ```
@@ -75,16 +82,21 @@ echo QRInvoice::create('12-3456789012/0100', 987.60, '2016001234')
 
 ## Rozšířené možnosti QR platby (standard ČBA SPAYD)
 
-Knihovna plně podporuje veškeré volitelné atributy standardu ČBA:
+Knihovna plně podporuje veškeré volitelné atributy standardu ČBA s využitím Enumů:
 
 ```php
+use miskith\QRInvoice\Enum\Currency;
+use miskith\QRInvoice\Enum\PaymentType;
+use miskith\QRInvoice\QRInvoice;
+
 $qrInvoice = new QRInvoice()
     ->setAccount('12-3456789012/0100')
     ->setAmount(500.00)
+    ->setCurrency(Currency::CZK)
     ->setVariableSymbol('2026001')
     ->setMessage('Platba objednávky')
     // Požadavek na okamžitou platbu (převod během několika sekund)
-    ->setInstantPayment(true)
+    ->setInstantPayment(true) // nebo ->setPaymentType(PaymentType::Instant)
     // Alternativní účty (např. pro bezplatný převod v rámci stejné banky)
     ->setAlternativeAccounts(['2501301193/2010', 'CZ5855000000001265098001+RZBCCZPP'])
     // Notifikace výstavci o odeslání platby na e-mail nebo SMS
@@ -111,14 +123,17 @@ Při vyplnění údajů faktury (`setInvoiceId`, `setInvoiceDate` apod.) je vytv
 
 require __DIR__ . '/vendor/autoload.php';
 
+use miskith\QRInvoice\Enum\InvoiceDocumentType;
+use miskith\QRInvoice\Enum\TaxPerformance;
 use miskith\QRInvoice\QRInvoice;
 
 $qrInvoice = QRInvoice::create('27-16060243/0300', 495.00, '012150672')
     ->setInvoiceId('012150672')
+    ->setInvoiceDocumentType(InvoiceDocumentType::TaxInvoice)
     ->setDueDate(new \DateTime('2026-12-17'))
     ->setInvoiceDate(new \DateTime('2026-12-01'))
     ->setTaxDate(new \DateTime('2026-12-01'))
-    ->setTaxPerformance(0)
+    ->setTaxPerformance(TaxPerformance::Standard)
     ->setCompanyTaxId('CZ60194383')
     ->setCompanyRegistrationId('60194383')
     ->setInvoiceSubjectTaxId('CZ12345678')
@@ -141,6 +156,8 @@ Pokud chcete vygenerovat pouze účetní údaje faktury bez platebního příkaz
 
 require __DIR__ . '/vendor/autoload.php';
 
+use miskith\QRInvoice\Enum\InvoiceDocumentType;
+use miskith\QRInvoice\Enum\TaxPerformance;
 use miskith\QRInvoice\QRInvoice;
 
 $qrInvoice = new QRInvoice()
@@ -149,11 +166,11 @@ $qrInvoice = new QRInvoice()
     ->setAmount(61189.00)
     ->setVariableSymbol('3310001054')
     ->setInvoiceId('2001401154')
-    ->setInvoiceDocumentType(9)
+    ->setInvoiceDocumentType(InvoiceDocumentType::Other) // Enum nebo int 9
     ->setDueDate(new \DateTime('2026-04-12'))
     ->setInvoiceDate(new \DateTime('2026-04-04'))
     ->setTaxDate(new \DateTime('2026-04-04'))
-    ->setTaxPerformance(0)
+    ->setTaxPerformance(TaxPerformance::Standard)       // Enum nebo int 0
     ->setCompanyTaxId('CZ25568736')
     ->setCompanyRegistrationId('25568736')
     ->setInvoiceSubjectTaxId('CZ25568736')
@@ -177,36 +194,41 @@ echo $qrInvoice->getQRCodeImage();
 
 ### Uložení do souboru
 
-Metoda `saveQRCodeImage(string $path, string $format = 'png', int $size = 300, int $margin = 10)` podporuje následující formáty:
+Pro volbu výstupního formátu doporučujeme používat Enum `Format`:
 
 ```php
-// PNG o velikosti 300x300 px
-$qrInvoice->saveQRCodeImage('qrcode.png', 'png', 300);
+use miskith\QRInvoice\Enum\Format;
+
+// PNG o velikosti 300x300 px (výchozí)
+$qrInvoice->saveQRCodeImage('qrcode.png', Format::Png, 300);
 
 // SVG o velikosti 200x200 px s 5 px marginem
-$qrInvoice->saveQRCodeImage('qrcode.svg', 'svg', 200, 5);
+$qrInvoice->saveQRCodeImage('qrcode.svg', Format::Svg, 200, 5);
 
 // WebP obrázek
-$qrInvoice->saveQRCodeImage('qrcode.webp', 'webp', 300);
+$qrInvoice->saveQRCodeImage('qrcode.webp', Format::Webp, 300);
 
 // GIF obrázek
-$qrInvoice->saveQRCodeImage('qrcode.gif', 'gif', 150);
+$qrInvoice->saveQRCodeImage('qrcode.gif', Format::Gif, 150);
 
 // PDF dokument
-$qrInvoice->saveQRCodeImage('qrcode.pdf', 'pdf', 300);
+$qrInvoice->saveQRCodeImage('qrcode.pdf', Format::Pdf, 300);
 
 // EPS vektorový soubor
-$qrInvoice->saveQRCodeImage('qrcode.eps', 'eps', 300);
+$qrInvoice->saveQRCodeImage('qrcode.eps', Format::Eps, 300);
+
+// Binární výstup
+$qrInvoice->saveQRCodeImage('qrcode.bin', Format::Binary, 300);
 ```
 
-#### Přehled podporovaných formátů:
-* **PNG** (`png`)
-* **SVG** (`svg`)
-* **WebP** (`webp`)
-* **GIF** (`gif`)
-* **PDF** (`pdf`)
-* **EPS** (`eps`)
-* **Binární** (`bin`, `binary`)
+#### Přehled hodnot Enumu `Format`:
+* `Format::Png`
+* `Format::Svg`
+* `Format::Webp`
+* `Format::Gif`
+* `Format::Pdf`
+* `Format::Eps`
+* `Format::Binary` (nebo alias `Format::Bin`)
 
 ### Zobrazení Data URI
 

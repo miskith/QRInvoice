@@ -9,6 +9,8 @@
  * please view LICENSE.
  */
 
+use miskith\QRInvoice\Enum\InvoiceDocumentType;
+use miskith\QRInvoice\Enum\TaxPerformance;
 use miskith\QRInvoice\QRInvoice;
 use PHPUnit\Framework\TestCase;
 
@@ -189,5 +191,24 @@ class QRInvoiceTest extends TestCase
 		);
 
 		$this->assertSame($expected, $qr->__toString());
+	}
+
+	public function testDocumentTypeAndTaxPerformanceEnums(): void
+	{
+		$qr = QRInvoice::create('12-3456789012/0100', '1234.56', '2016001234')
+			->setIsOnlyInvoice(true)
+			->setInvoiceId('123456789')
+			->setInvoiceDate(new DateTime('2021-07-15'))
+			->setInvoiceDocumentType(InvoiceDocumentType::CreditNote)
+			->setTaxPerformance(TaxPerformance::SecondReduced);
+
+		$this->assertStringContainsString('*TD:2*', $qr->__toString());
+		$this->assertStringContainsString('*TP:2*', $qr->__toString());
+
+		$qr->setInvoiceDocumentType(InvoiceDocumentType::Other)
+			->setTaxPerformance(TaxPerformance::Standard);
+
+		$this->assertStringContainsString('*TD:9*', $qr->__toString());
+		$this->assertStringContainsString('*TP:0*', $qr->__toString());
 	}
 }
