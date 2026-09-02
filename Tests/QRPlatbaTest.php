@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /*
  * This file is part of the library "QRInvoice".
  *
@@ -21,7 +23,7 @@ use PHPUnit\Framework\TestCase;
 /**
  * Class QRPlatbaTest.
  */
-class QRPlatbaTest extends TestCase
+final class QRPlatbaTest extends TestCase
 {
 	public function testFakeCurrencyString(): void
 	{
@@ -426,11 +428,12 @@ class QRPlatbaTest extends TestCase
 
 			$qr->saveQRCodeImage($tmpSvg, Format::Svg, 100, 5);
 			$this->assertFileExists($tmpSvg);
-			$this->assertStringContainsString('<svg', file_get_contents($tmpSvg));
+			$this->assertStringContainsString('<svg', (string) file_get_contents($tmpSvg));
 		} finally {
 			if (file_exists($tmpPng)) {
 				unlink($tmpPng);
 			}
+
 			if (file_exists($tmpSvg)) {
 				unlink($tmpSvg);
 			}
@@ -637,7 +640,7 @@ class QRPlatbaTest extends TestCase
 			->setAmount(100.00)
 			->withDefaultLogo(45);
 
-		$this->assertNotNull($qr->getLogo());
+		$this->assertInstanceOf(Endroid\QrCode\Logo\LogoInterface::class, $qr->getLogo());
 		$this->assertStringContainsString('qr-platba-logo.png', $qr->getLogo()->getPath());
 		$this->assertSame(45, $qr->getLogo()->getResizeToWidth());
 		$this->assertSame(45, $qr->getLogo()->getResizeToHeight());
@@ -653,7 +656,7 @@ class QRPlatbaTest extends TestCase
 			->setAmount(100.00)
 			->setLogo(__DIR__ . '/../readme/sample-logo.png', 60, 60);
 
-		$this->assertNotNull($qr->getLogo());
+		$this->assertInstanceOf(Endroid\QrCode\Logo\LogoInterface::class, $qr->getLogo());
 		$this->assertSame(60, $qr->getLogo()->getResizeToWidth());
 
 		$qr->setLogo(null);
@@ -677,7 +680,7 @@ class QRPlatbaTest extends TestCase
 
 		// 6-digit hex with hash
 		$qr->setForegroundColor('#4F46E5');
-		$this->assertNotNull($qr->getForegroundColor());
+		$this->assertInstanceOf(Endroid\QrCode\Color\ColorInterface::class, $qr->getForegroundColor());
 		$this->assertSame(79, $qr->getForegroundColor()->getRed());
 		$this->assertSame(70, $qr->getForegroundColor()->getGreen());
 		$this->assertSame(229, $qr->getForegroundColor()->getBlue());
@@ -724,7 +727,7 @@ class QRPlatbaTest extends TestCase
 		$qr->setAccount('27-16060243/0300');
 
 		$qr->setTransparentBackground(true);
-		$this->assertNotNull($qr->getBackgroundColor());
+		$this->assertInstanceOf(Endroid\QrCode\Color\ColorInterface::class, $qr->getBackgroundColor());
 		$this->assertSame(127, $qr->getBackgroundColor()->getAlpha());
 
 		$img = $qr->getQRCodeImage();
@@ -864,7 +867,7 @@ class QRPlatbaTest extends TestCase
 		$parsed = QRInvoice::fromString($string);
 
 		$this->assertSame($original->getAccount(), $parsed->getAccount());
-		$this->assertSame(1499.90, $parsed->getAmount());
+		$this->assertEqualsWithDelta(1499.90, $parsed->getAmount(), PHP_FLOAT_EPSILON);
 		$this->assertSame(Currency::CZK, $parsed->getCurrency());
 		$this->assertSame('CZK', $parsed->getCurrencyString());
 		$this->assertSame('2026105', $parsed->getVariableSymbol());
@@ -919,7 +922,7 @@ class QRPlatbaTest extends TestCase
 		$this->assertSame('2026-12-31', $parsed->getDueDate()?->format('Y-m-d'));
 		$this->assertSame('CZ60194383', $parsed->getCompanyTaxId());
 		$this->assertSame('60194383', $parsed->getCompanyRegistrationId());
-		$this->assertSame(2420.00, $parsed->getAmount());
+		$this->assertEqualsWithDelta(2420.00, $parsed->getAmount(), PHP_FLOAT_EPSILON);
 	}
 
 	public function testParseStandaloneInvoiceSid(): void
@@ -937,7 +940,7 @@ class QRPlatbaTest extends TestCase
 		$this->assertTrue($parsed->isOnlyInvoice());
 		$this->assertSame('FV-123', $parsed->getInvoiceId());
 		$this->assertSame('2026-11-15', $parsed->getInvoiceDate()?->format('Y-m-d'));
-		$this->assertSame(800.00, $parsed->getAmount());
+		$this->assertEqualsWithDelta(800.00, $parsed->getAmount(), PHP_FLOAT_EPSILON);
 	}
 
 	public function testParseEpcString(): void
@@ -957,7 +960,7 @@ class QRPlatbaTest extends TestCase
 		$this->assertSame(Standard::Epc, $parsed->getStandard());
 		$this->assertSame('SK6702000000001234567890', $parsed->getIban());
 		$this->assertSame('EuroCorp s.r.o.', $parsed->getRecipientName());
-		$this->assertSame(345.50, $parsed->getAmount());
+		$this->assertEqualsWithDelta(345.50, $parsed->getAmount(), PHP_FLOAT_EPSILON);
 		$this->assertSame(Currency::EUR, $parsed->getCurrency());
 		$this->assertSame('SUBAASKBX', $parsed->getBic());
 		$this->assertSame('2026009', $parsed->getVariableSymbol());

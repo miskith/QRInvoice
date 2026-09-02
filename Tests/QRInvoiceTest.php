@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /*
  * This file is part of the library "QRInvoice".
  *
@@ -17,7 +19,7 @@ use PHPUnit\Framework\TestCase;
 /**
  * Class QRInvoiceTest.
  */
-class QRInvoiceTest extends TestCase
+final class QRInvoiceTest extends TestCase
 {
 	public function testSimpleInvoice(): void
 	{

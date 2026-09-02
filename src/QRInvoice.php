@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /*
  * This file is part of the library "QRInvoice".
  *
@@ -39,7 +41,7 @@ use miskith\QRInvoice\Enum\TaxPerformance;
  *
  * @see https://raw.githubusercontent.com/snoblucha/QRPlatba/master/QRPlatba.php
  */
-class QRInvoice
+class QRInvoice implements \Stringable
 {
 	/**
 	 * Verze QR formátu QR Platby.
@@ -75,7 +77,7 @@ class QRInvoice
 	];
 
 	/**
-	 * @var array klíče QR Platby
+	 * @var array<string, string|bool|null> klíče QR Platby
 	 */
 	private array $spd_keys = [
 		'ACC' => null,
@@ -117,7 +119,7 @@ class QRInvoice
 	];
 
 	/**
-	 * @var array klíče QR Faktury
+	 * @var array<string, string|bool|null> klíče QR Faktury
 	 */
 	private array $sid_keys = [
 		'ID' => null,
@@ -238,17 +240,20 @@ class QRInvoice
 	 * @throws \InvalidArgumentException
 	 * @throws QRInvoiceException
 	 */
-	public function __construct(?string $account = null, int | float | null $amount = null, ?string $variable = null, Currency | string | null $currency = null)
+	public function __construct(?string $account = null, int | float | string | null $amount = null, ?string $variable = null, Currency | string | null $currency = null)
 	{
 		if ($account) {
 			str_contains($account, '/') ? $this->setAccount($account) : $this->setIban($account);
 		}
-		if ($amount) {
+
+		if ($amount !== null && $amount !== '') {
 			$this->setAmount($amount);
 		}
+
 		if ($variable) {
 			$this->setVariableSymbol($variable);
 		}
+
 		if ($currency) {
 			$this->setCurrency($currency);
 		}
@@ -260,7 +265,7 @@ class QRInvoice
 	 * @throws \InvalidArgumentException
 	 * @throws QRInvoiceException
 	 */
-	public static function create(?string $account = null, int | float | null $amount = null, ?string $variable = null, Currency | string | null $currency = null): QRInvoice
+	public static function create(?string $account = null, int | float | string | null $amount = null, ?string $variable = null, Currency | string | null $currency = null): QRInvoice
 	{
 		return new self($account, $amount, $variable, $currency);
 	}
@@ -269,7 +274,7 @@ class QRInvoice
 	 * Tovární metoda pro rychlé vytvoření okamžité platby (Instant Payment - PT:IP).
 	 *
 	 * @param string|null $account Číslo bankovního účtu nebo IBAN
-	 * @param int|float|null $amount Částka platby
+	 * @param int|float|string|null $amount Částka platby
 	 * @param string|null $variable Variabilní symbol platby
 	 * @param Currency|string|null $currency Měna platby (výchozí: CZK)
 	 * @param string|null $message Zpráva pro příjemce
@@ -277,7 +282,7 @@ class QRInvoice
 	 */
 	public static function createInstant(
 		?string $account = null,
-		int | float | null $amount = null,
+		int | float | string | null $amount = null,
 		?string $variable = null,
 		Currency | string | null $currency = null,
 		?string $message = null,
@@ -297,7 +302,7 @@ class QRInvoice
 	 *
 	 * @param string $account IBAN nebo číslo účtu příjemce
 	 * @param string $recipientName Jméno příjemce (povinné dle standardu SEPA EPC)
-	 * @param int|float|null $amount Částka v EUR
+	 * @param int|float|string|null $amount Částka v EUR
 	 * @param string|null $message Zpráva pro příjemce
 	 * @param string|null $bic BIC / SWIFT kód banky příjemce
 	 * @param string|null $variableSymbol Variabilní symbol
@@ -306,7 +311,7 @@ class QRInvoice
 	public static function createEpc(
 		string $account,
 		string $recipientName,
-		int | float | null $amount = null,
+		int | float | string | null $amount = null,
 		?string $message = null,
 		?string $bic = null,
 		?string $variableSymbol = null,
@@ -321,7 +326,7 @@ class QRInvoice
 			$qr->setIban($account);
 		}
 
-		if ($amount !== null) {
+		if ($amount !== null && $amount !== '') {
 			$qr->setAmount($amount);
 		}
 
@@ -344,7 +349,7 @@ class QRInvoice
 	 * Tovární metoda pro rychlé vytvoření platby se slovenským číslem účtu.
 	 *
 	 * @param string $account Slovenské číslo účtu ve formátu [předčíslí-]číslo/kód_banky
-	 * @param int|float|null $amount Částka platby
+	 * @param int|float|string|null $amount Částka platby
 	 * @param string|null $variable Variabilní symbol platby
 	 * @param Currency|string|null $currency Měna platby (výchozí: EUR)
 	 * @param string|null $message Zpráva pro příjemce
@@ -352,7 +357,7 @@ class QRInvoice
 	 */
 	public static function createSlovak(
 		string $account,
-		int | float | null $amount = null,
+		int | float | string | null $amount = null,
 		?string $variable = null,
 		Currency | string | null $currency = Currency::EUR,
 		?string $message = null,
@@ -360,7 +365,7 @@ class QRInvoice
 		$qr = new self();
 		$qr->setSlovakAccount($account);
 
-		if ($amount !== null) {
+		if ($amount !== null && $amount !== '') {
 			$qr->setAmount($amount);
 		}
 
@@ -383,7 +388,7 @@ class QRInvoice
 	 * Tovární metoda pro rychlé vytvoření QR Faktury (daňového dokladu).
 	 *
 	 * @param string $account Číslo bankovního účtu nebo IBAN
-	 * @param int|float $amount Celková částka k úhradě
+	 * @param int|float|string $amount Celková částka k úhradě
 	 * @param string $invoiceId Číslo faktury / evidenční číslo dokladu
 	 * @param DateTime|null $dueDate Datum splatnosti
 	 * @param DateTime|null $invoiceDate Datum vystavení dokladu
@@ -396,7 +401,7 @@ class QRInvoice
 	 */
 	public static function createTaxInvoice(
 		string $account,
-		int | float $amount,
+		int | float | string $amount,
 		string $invoiceId,
 		?DateTime $dueDate = null,
 		?DateTime $invoiceDate = null,
@@ -419,7 +424,7 @@ class QRInvoice
 			->setInvoiceDate($invoiceDate)
 			->setDueDate($dueDate);
 
-		if ($taxDate !== null) {
+		if ($taxDate instanceof DateTime) {
 			$qr->setTaxDate($taxDate);
 		}
 
@@ -469,7 +474,7 @@ class QRInvoice
 
 		$chunks = explode('*', trim($string, '*'));
 		$header = array_shift($chunks);
-		$version = array_shift($chunks);
+		array_shift($chunks);
 
 		if (!in_array($header, ['SPD', 'SID'], true)) {
 			throw new QRInvoiceException(sprintf('Invalid format header "%s". Expected SPD or SID.', $header));
@@ -489,6 +494,7 @@ class QRInvoice
 				} else {
 					$qr->spd_keys['CRC32'] = true;
 				}
+
 				continue;
 			}
 
@@ -502,6 +508,7 @@ class QRInvoice
 					if ($invChunk === '' || !str_contains($invChunk, ':')) {
 						continue;
 					}
+
 					[$invKey, $invVal] = explode(':', $invChunk, 2);
 					if ($invKey === 'CRC32') {
 						$qr->sid_keys['CRC32'] = true;
@@ -509,6 +516,7 @@ class QRInvoice
 						$qr->sid_keys[$invKey] = $invVal;
 					}
 				}
+
 				continue;
 			}
 
@@ -1226,7 +1234,7 @@ class QRInvoice
 			throw new QRInvoiceException('Maximum of 2 alternative accounts is allowed.');
 		}
 
-		if (empty($accounts)) {
+		if ($accounts === []) {
 			$this->spd_keys['ALT-ACC'] = null;
 
 			return $this;
@@ -1270,8 +1278,16 @@ class QRInvoice
 	/**
 	 * Nastavení částky.
 	 */
-	public function setAmount(int | float $amount): QRInvoice
+	public function setAmount(int | float | string $amount): QRInvoice
 	{
+		if (is_string($amount)) {
+			if (!is_numeric($amount)) {
+				throw new \InvalidArgumentException(sprintf('Amount "%s" is not numeric.', $amount));
+			}
+
+			$amount = (float) $amount;
+		}
+
 		$this->spd_keys['AM'] = $this->sid_keys['AM'] = sprintf('%.2F', $amount);
 
 		return $this;
@@ -1307,6 +1323,7 @@ class QRInvoice
 		if (mb_strlen($ss) > 10) {
 			throw new QRInvoiceException('Specific symbol is longer than 10 characters');
 		}
+
 		$this->spd_keys['X-SS'] = $ss;
 
 		return $this;
@@ -1790,6 +1807,7 @@ class QRInvoice
 			if ($key === 'CRC32' || null === $value) {
 				continue;
 			}
+
 			$attributes[$key] = (string) $value;
 		}
 
@@ -1820,6 +1838,7 @@ class QRInvoice
 			) {
 				continue;
 			}
+
 			$attributes[$key] = (string) $value;
 		}
 
@@ -1900,7 +1919,7 @@ class QRInvoice
 			mb_substr($unstructured, 0, 140),
 		];
 
-		while (!empty($lines) && end($lines) === '') {
+		while ($lines !== [] && end($lines) === '') {
 			array_pop($lines);
 		}
 
@@ -1925,6 +1944,7 @@ class QRInvoice
 				if ($key === 'CRC32' || null === $value) {
 					continue;
 				}
+
 				$chunks[] = $key . ':' . $value;
 			}
 
@@ -1949,6 +1969,7 @@ class QRInvoice
 				) {
 					continue;
 				}
+
 				$chunks[] = $key . ':' . $value;
 			}
 
@@ -2042,13 +2063,13 @@ class QRInvoice
 	 */
 	public function getQRCodeInstance(int $size = 300, int $margin = 10): QrCode
 	{
-		$errorCorrection = $this->logo !== null ? QrErrorCorrectionLevel::High : QrErrorCorrectionLevel::Medium;
+		$errorCorrection = $this->logo instanceof LogoInterface ? QrErrorCorrectionLevel::High : QrErrorCorrectionLevel::Medium;
 
 		return new QrCode(
 			data: (string) $this,
-			size: $size - ($margin * 2),
 			encoding: new QrEncoding('UTF-8'),
 			errorCorrectionLevel: $errorCorrection,
+			size: $size - ($margin * 2),
 			margin: $margin,
 			roundBlockSizeMode: QrRoundBlockSizeMode::Enlarge,
 			foregroundColor: $this->foregroundColor ?? new QrColor(0, 0, 0, 0),
@@ -2154,7 +2175,7 @@ class QRInvoice
 	 */
 	private function stripDiacritics(string $string): string
 	{
-		$string = str_replace(
+		return str_replace(
 			[
 				'ě', 'š', 'č', 'ř', 'ž', 'ý', 'á', 'í', 'é', 'ú', 'ů',
 				'ó', 'ť', 'ď', 'ľ', 'ň', 'ŕ', 'â', 'ă', 'ä', 'ĺ', 'ć',
@@ -2171,7 +2192,5 @@ class QRInvoice
 			],
 			$string,
 		);
-
-		return $string;
 	}
 }
