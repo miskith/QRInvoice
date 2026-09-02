@@ -13,6 +13,7 @@ QR platba zjednodušuje koncovému uživateli provedení příkazu k úhradě v 
 
 - Generování standardního řetězce **SPAYD 1.0** i integrované či samostatné **QR Faktury** (**SID 1.0**).
 - Plná typovost s podporou **PHP 8.4 Enumů** (`Format`, `Currency`, `PaymentType`, `InvoiceDocumentType`, `TaxPerformance`).
+- Možnost validace českých čísel účtů dle vyhlášky ČNB (formát a vážené **Modulo 11**) pomocí `setValidateAccount(true)` nebo staticky `QRInvoice::validateCzechAccount($acc)`.
 - Podpora pro **okamžité platby** (`PT:IP`).
 - Podpora pro **alternativní účty příjemce** (`ALT-ACC`).
 - Podpora pro **notifikace o platbě** na e-mail (`NT:E`) i SMS (`NT:P`).
@@ -55,7 +56,7 @@ use miskith\QRInvoice\Enum\Currency;
 use miskith\QRInvoice\QRInvoice;
 
 $qrInvoice = new QRInvoice()
-    ->setAccount('12-3456789012/0100')
+    ->setAccount('27-16060243/0300')
     ->setAmount(1234.50)
     ->setVariableSymbol('2016001234')
     ->setConstantSymbol('0308')
@@ -73,7 +74,7 @@ echo $qrInvoice->getQRCodeImage(); // Zobrazí <img> tag s QR kódem
 Lze použít i zkrácený zápis pomocí statického konstruktoru:
 
 ```php
-echo QRInvoice::create('12-3456789012/0100', 987.60, '2016001234')
+echo QRInvoice::create('27-16060243/0300', 987.60, '2016001234')
     ->setMessage('QR platba je parádní!')
     ->getQRCodeImage();
 ```
@@ -90,7 +91,7 @@ use miskith\QRInvoice\Enum\PaymentType;
 use miskith\QRInvoice\QRInvoice;
 
 $qrInvoice = new QRInvoice()
-    ->setAccount('12-3456789012/0100')
+    ->setAccount('27-16060243/0300')
     ->setAmount(500.00)
     ->setCurrency(Currency::CZK)
     ->setVariableSymbol('2026001')
@@ -110,6 +111,24 @@ $qrInvoice = new QRInvoice()
     ->setRepeat(7)
     // Automatický kontrolní součet integrity
     ->setCRC32(true);
+```
+
+---
+
+## Validace čísla účtu (Modulo 11 ČNB)
+
+Knihovna obsahuje validátor formátu a váženého kontrolního součtu modulo 11 pro česká čísla bankovních účtů dle vyhlášky ČNB č. 169/2011 Sb.:
+
+```php
+use miskith\QRInvoice\QRInvoice;
+
+// Zapnutí validace čísla účtu při přiřazení:
+$qr = new QRInvoice();
+$qr->setValidateAccount(true)
+   ->setAccount('27-16060243/0300'); // Pokud účet neprojde kontrolou Modulo 11, vyhodí QRInvoiceException
+
+// Samostatné ověření čísla účtu kdekoli v aplikaci:
+$isValid = QRInvoice::validateCzechAccount('27-16060243/0300'); // true / false
 ```
 
 ---
@@ -241,7 +260,7 @@ $dataUri = $qrInvoice->getQRCodeImage(false);
 
 ```php
 $spaydString = (string) $qrInvoice;
-// např. "SPD*1.0*ACC:CZ0301000000123456789012*AM:1234.50*CC:CZK*X-VS:2016001234"
+// např. "SPD*1.0*ACC:CZ3103000000270016060243*AM:1234.50*CC:CZK*X-VS:2016001234"
 ```
 
 ---

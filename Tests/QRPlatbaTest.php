@@ -435,4 +435,64 @@ class QRPlatbaTest extends TestCase
 			}
 		}
 	}
+
+	public function testDisabledValidationByDefaultAllowsDummyAccount(): void
+	{
+		$qr = new QRInvoice();
+		$this->assertFalse($qr->isValidateAccount());
+
+		$qr->setAccount('12-3456789012/0100');
+		$this->assertStringContainsString('ACC:CZ0301000000123456789012', $qr->__toString());
+	}
+
+	public function testEnabledValidationThrowsOnInvalidAccount(): void
+	{
+		$qr = new QRInvoice();
+		$qr->setValidateAccount(true);
+
+		$this->assertTrue($qr->isValidateAccount());
+		$this->expectException(QRInvoiceException::class);
+		$this->expectExceptionMessage('is not a valid Czech bank account (modulo 11 check failed)');
+
+		$qr->setAccount('12-3456789012/0100');
+	}
+
+	public function testValidCzechAccountPassesValidationWhenEnabled(): void
+	{
+		$qr1 = new QRInvoice();
+		$qr1->setValidateAccount(true)->setAccount('222885/5500');
+		$this->assertNotEmpty($qr1->__toString());
+
+		$qr2 = new QRInvoice();
+		$qr2->setValidateAccount(true)->setAccount('27-16060243/0300');
+		$this->assertNotEmpty($qr2->__toString());
+
+		$qr3 = new QRInvoice();
+		$qr3->setValidateAccount(true)->setAccount('19-2000145399/0800');
+		$this->assertNotEmpty($qr3->__toString());
+	}
+
+	public function testStaticValidateCzechAccount(): void
+	{
+		$this->assertTrue(QRInvoice::validateCzechAccount('222885/5500'));
+		$this->assertTrue(QRInvoice::validateCzechAccount('27-16060243/0300'));
+		$this->assertTrue(QRInvoice::validateCzechAccount('19-2000145399/0800'));
+		$this->assertTrue(QRInvoice::validateCzechAccount('2501301193/2010'));
+
+		$this->assertFalse(QRInvoice::validateCzechAccount('12-3456789012/0100'));
+		$this->assertFalse(QRInvoice::validateCzechAccount('1234567890/0100'));
+		$this->assertFalse(QRInvoice::validateCzechAccount('invalid-account'));
+		$this->assertFalse(QRInvoice::validateCzechAccount('123/010'));
+	}
+
+	public function testAlternativeAccountValidationWhenEnabled(): void
+	{
+		$qr = new QRInvoice();
+		$qr->setValidateAccount(true)->setAccount('222885/5500');
+
+		$this->expectException(QRInvoiceException::class);
+		$this->expectExceptionMessage('Alternative account number "12-3456789012/0100" is not a valid Czech bank account');
+
+		$qr->addAlternativeAccount('12-3456789012/0100');
+	}
 }

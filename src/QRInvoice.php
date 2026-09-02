@@ -184,11 +184,17 @@ class QRInvoice
 	private bool $isOnlyInvoice = false;
 
 	/**
+	 * Přepínač validace čísla účtu pro tuto instanci (Modulo 11 ČNB).
+	 */
+	private bool $validateAccount = false;
+
+	/**
 	 * Konstruktor nové platby.
 	 *
 	 * @throws \InvalidArgumentException
+	 * @throws QRInvoiceException
 	 */
-	public function __construct(?string $account = null, int | float | null $amount = null, ?string $variable = null, ?string $currency = null)
+	public function __construct(?string $account = null, int | float | null $amount = null, ?string $variable = null, Currency | string | null $currency = null)
 	{
 		if ($account) {
 			$this->setAccount($account);
@@ -208,17 +214,42 @@ class QRInvoice
 	 * Statický konstruktor nové platby.
 	 *
 	 * @throws \InvalidArgumentException
+	 * @throws QRInvoiceException
 	 */
-	public static function create(?string $account = null, int | float | null $amount = null, ?string $variable = null, ?string $currency = null): QRInvoice
+	public static function create(?string $account = null, int | float | null $amount = null, ?string $variable = null, Currency | string | null $currency = null): QRInvoice
 	{
 		return new self($account, $amount, $variable, $currency);
 	}
 
 	/**
+	 * Povolení či zakázání validace českého čísla účtu (Modulo 11 ČNB).
+	 */
+	public function setValidateAccount(bool $validate = true): QRInvoice
+	{
+		$this->validateAccount = $validate;
+
+		return $this;
+	}
+
+	/**
+	 * Zjistí, zda je aktivní validace čísla účtu.
+	 */
+	public function isValidateAccount(): bool
+	{
+		return $this->validateAccount;
+	}
+
+	/**
 	 * Nastavení čísla účtu ve formátu 12-3456789012/0100.
+	 *
+	 * @throws QRInvoiceException
 	 */
 	public function setAccount(string $account): QRInvoice
 	{
+		if ($this->validateAccount && !self::validateCzechAccount($account)) {
+			throw new QRInvoiceException(sprintf('Account number "%s" is not a valid Czech bank account (modulo 11 check failed).', $account));
+		}
+
 		$this->spd_keys['ACC'] = $this->sid_keys['ACC'] = self::accountToIban($account);
 
 		return $this;
@@ -252,6 +283,12 @@ class QRInvoice
 			return $this;
 		}
 
+		foreach ($accounts as $acc) {
+			if ($this->validateAccount && str_contains($acc, '/') && !self::validateCzechAccount($acc)) {
+				throw new QRInvoiceException(sprintf('Alternative account number "%s" is not a valid Czech bank account (modulo 11 check failed).', $acc));
+			}
+		}
+
 		$ibans = array_map(static fn (string $acc): string => str_contains($acc, '/') ? self::accountToIban($acc) : $acc, $accounts);
 		$altAcc = implode(',', $ibans);
 
@@ -271,6 +308,10 @@ class QRInvoice
 	 */
 	public function addAlternativeAccount(string $account): QRInvoice
 	{
+		if ($this->validateAccount && str_contains($account, '/') && !self::validateCzechAccount($account)) {
+			throw new QRInvoiceException(sprintf('Alternative account number "%s" is not a valid Czech bank account (modulo 11 check failed).', $account));
+		}
+
 		$current = $this->spd_keys['ALT-ACC'] !== null ? explode(',', (string) $this->spd_keys['ALT-ACC']) : [];
 		$current[] = str_contains($account, '/') ? self::accountToIban($account) : $account;
 
@@ -955,6 +996,49 @@ class QRInvoice
 			foregroundColor: new QrColor(0, 0, 0, 0),
 			backgroundColor: new QrColor(255, 255, 255, 0),
 		);
+	}
+
+	/**
+	 * Ověří, zda české číslo účtu splňuje pravidla ČNB (formát a vážené Modulo 11).
+	 */
+	public static function validateCzechAccount(string $accountNumber): bool
+	{
+		if (!preg_match('/^(?:([0-9]{1,6})-)?([0-9]{2,10})\/([0-9]{4})$/', trim($accountNumber), $matches)) {
+			return false;
+		}
+
+		$prefix = $matches[1] ?? '';
+		$account = $matches[2];
+		$weights = [1, 2, 4, 8, 5, 10, 9, 7, 3, 6];
+
+		if (!self::checkModulo11($account, $weights)) {
+			return false;
+		}
+
+		if ($prefix !== '' && (int) $prefix !== 0) {
+			if (!self::checkModulo11($prefix, array_slice($weights, 0, 6))) {
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	/**
+	 * Výpočet váženého kontrolního součtu modulo 11 zprava doleva dle specifikace ČNB.
+	 *
+	 * @param array<int> $weights
+	 */
+	public static function checkModulo11(string $number, array $weights): bool
+	{
+		$len = strlen($number);
+		$sum = 0;
+		for ($i = 0; $i < $len; ++$i) {
+			$digit = (int) $number[$len - 1 - $i];
+			$sum += $digit * $weights[$i];
+		}
+
+		return ($sum % 11) === 0;
 	}
 
 	/**
