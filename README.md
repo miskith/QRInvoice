@@ -3,7 +3,7 @@
 [![Latest Stable Version](https://poser.pugx.org/miskith/qr-platba/v/stable)](https://packagist.org/packages/miskith/qr-platba)
 [![Total Downloads](https://poser.pugx.org/miskith/qr-platba/downloads)](https://packagist.org/packages/miskith/qr-platba)
 [![License](https://poser.pugx.org/miskith/qr-platba/license)](https://packagist.org/packages/miskith/qr-platba)
-[![Build Status](https://travis-ci.com/miskith/QRInvoice.svg)](https://travis-ci.com/miskith/QRInvoice)
+[![CI](https://github.com/miskith/QRPlatba/actions/workflows/ci.yml/badge.svg)](https://github.com/miskith/QRPlatba/actions/workflows/ci.yml)
 
 Knihovna pro snadné a spolehlivé generování platebních QR kódů (**QR Platba** dle standardu České bankovní asociace SPAYD) a fakturačních QR kódů (**QR Faktura** dle specifikace Komory daňových poradců ČR) v PHP.
 
