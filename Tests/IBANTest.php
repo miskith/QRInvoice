@@ -9,8 +9,8 @@
  * please view LICENSE.
  */
 
-use PHPUnit\Framework\TestCase;
 use miskith\QRInvoice\QRInvoice;
+use PHPUnit\Framework\TestCase;
 
 /**
  * Class QRInvoiceTest.
@@ -23,7 +23,7 @@ class IBANTest extends TestCase
 
 		$this->assertSame(
 			'CZ3620100000002501301193',
-			$string
+			$string,
 		);
 	}
 }

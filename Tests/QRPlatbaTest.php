@@ -9,9 +9,9 @@
  * please view LICENSE.
  */
 
+use Endroid\QrCode\QrCode;
 use miskith\QRInvoice\QRInvoice;
 use PHPUnit\Framework\TestCase;
-use Endroid\QrCode\QrCode;
 
 /**
  * Class QRPlatbaTest.
@@ -34,7 +34,7 @@ class QRPlatbaTest extends TestCase
 
 		$this->assertSame(
 			'SPD*1.0*ACC:CZ0301000000123456789012*AM:1234.56*CC:CZK*MSG:Duakritics*X-VS:2016001234',
-			$string->__toString()
+			$string->__toString(),
 		);
 
 		$string = QRInvoice::create('12-3456789012/0100', '1234.56', '2016001234')
@@ -43,7 +43,7 @@ class QRPlatbaTest extends TestCase
 
 		$this->assertSame(
 			'SPD*1.0*ACC:CZ0301000000123456789012*AM:1234.56*CC:CZK*MSG:Duakritics*X-VS:2016001234',
-			$string->__toString()
+			$string->__toString(),
 		);
 	}
 
@@ -55,7 +55,7 @@ class QRPlatbaTest extends TestCase
 
 		$this->assertSame(
 			'SPD*1.0*ACC:CZ0301000000123456789012*AM:1234.56*CC:EUR*MSG:Duakritics*X-VS:2016001234',
-			$string->__toString()
+			$string->__toString(),
 		);
 	}
 
@@ -66,7 +66,7 @@ class QRPlatbaTest extends TestCase
 
 		$this->assertSame(
 			'SPD*1.0*ACC:CZ0301000000123456789012*AM:1234.56*CC:EUR*MSG:Duakritics*X-VS:2016001234',
-			$string->__toString()
+			$string->__toString(),
 		);
 	}
 
@@ -110,7 +110,7 @@ class QRPlatbaTest extends TestCase
 			->setSpecificSymbol('0308')
 			->setSpecificSymbol('1234')
 			->setCurrency('CZK')
-			->setDueDate(new \DateTime())
+			->setDueDate(new DateTime())
 			->saveQRCodeImage($temp_name, 'png', 100, 5);
 
 		$this->assertNotEmpty(file_get_contents($temp_name), 'QR code image for payment could not be created into the temp dir.');
@@ -130,7 +130,7 @@ class QRPlatbaTest extends TestCase
 			->setSpecificSymbol('0308')
 			->setSpecificSymbol('1234')
 			->setCurrency('CZK')
-			->setDueDate(new \DateTime())
+			->setDueDate(new DateTime())
 			->saveQRCodeImage($temp_name, 'svg', 300, 20);
 
 		$this->assertNotEmpty(file_get_contents($temp_name), 'QR code image for payment could not be created into the temp dir.');
@@ -148,7 +148,7 @@ class QRPlatbaTest extends TestCase
 			->setVariableSymbol('2016001234')
 			->setMessage('Toto je testovací QR platba.')
 			->setCurrency('CZK')
-			->setDueDate(new \DateTime())
+			->setDueDate(new DateTime())
 			->saveQRCodeImage($temp_name, 'webp', 100, 5);
 
 		$this->assertNotEmpty(file_get_contents($temp_name), 'QR code image for payment could not be created into the temp dir.');
@@ -166,7 +166,7 @@ class QRPlatbaTest extends TestCase
 			->setVariableSymbol('2016001234')
 			->setMessage('Toto je testovací QR platba.')
 			->setCurrency('CZK')
-			->setDueDate(new \DateTime())
+			->setDueDate(new DateTime())
 			->saveQRCodeImage($temp_name, 'gif', 100, 5);
 
 		$this->assertNotEmpty(file_get_contents($temp_name), 'QR code image for payment could not be created into the temp dir.');
@@ -180,7 +180,7 @@ class QRPlatbaTest extends TestCase
 
 		$this->assertSame(
 			'SPD*1.0*ACC:CZ0301000000123456789012*AM:1234.56*CC:CZK*X-VS:2016001234*RN:Duakritics',
-			$string->__toString()
+			$string->__toString(),
 		);
 	}
 }

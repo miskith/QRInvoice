@@ -11,19 +11,19 @@
 
 namespace miskith\QRInvoice;
 
+use DateTime;
+use Endroid\QrCode\Color\Color as QrColor;
+use Endroid\QrCode\Encoding\Encoding as QrEncoding;
 use Endroid\QrCode\ErrorCorrectionLevel as QrErrorCorrectionLevel;
+use Endroid\QrCode\QrCode;
 use Endroid\QrCode\RoundBlockSizeMode as QrRoundBlockSizeMode;
 use Endroid\QrCode\Writer\BinaryWriter as QrBinaryWriter;
-use Endroid\QrCode\Writer\WebPWriter as QrWebPWriter;
-use Endroid\QrCode\Encoding\Encoding as QrEncoding;
-use Endroid\QrCode\Writer\PngWriter as QrPngWriter;
 use Endroid\QrCode\Writer\EpsWriter as QrEpsWriter;
-use Endroid\QrCode\Writer\PdfWriter as QrPdfWriter;
-use Endroid\QrCode\Writer\SvgWriter as QrSvgWriter;
 use Endroid\QrCode\Writer\GifWriter as QrGifWriter;
-use Endroid\QrCode\Color\Color as QrColor;
-use Endroid\QrCode\QrCode;
-use DateTime;
+use Endroid\QrCode\Writer\PdfWriter as QrPdfWriter;
+use Endroid\QrCode\Writer\PngWriter as QrPngWriter;
+use Endroid\QrCode\Writer\SvgWriter as QrSvgWriter;
+use Endroid\QrCode\Writer\WebPWriter as QrWebPWriter;
 
 /**
  * Knihovna pro generování QR plateb v PHP.
@@ -689,7 +689,7 @@ class QRInvoice
 		$controlegetal = str_replace(
 			$alfa,
 			$alfa_replace,
-			mb_substr($iban, 4, mb_strlen($iban) - 4).mb_substr($iban, 0, 2).'00'
+			mb_substr($iban, 4, mb_strlen($iban) - 4).mb_substr($iban, 0, 2).'00',
 		);
 		$controlegetal = 98 - (int) bcmod($controlegetal, 97);
 		$iban = sprintf('CZ%02d%04d%06d%010s', $controlegetal, $bank, $pre, $acc);
@@ -717,7 +717,7 @@ class QRInvoice
 				'E', 'S', 'C', 'R', 'Z', 'Y', 'A', 'I', 'E', 'U', 'U',
 				'O', 'T', 'D', 'L', 'N', 'A', 'C', 'E', 'O', 'U',
 			],
-			$string
+			$string,
 		);
 
 		return $string;
