@@ -23,6 +23,7 @@ QR platba zjednodušuje koncovému uživateli provedení příkazu k úhradě v 
 - Získání čistého `data-uri` řetězce (`$qrInvoice->getQRCodeImage(false)`).
 - Uložení do souboru v široké škále formátů: **PNG, SVG, PDF, EPS, WebP, GIF, binární** (`$qrInvoice->saveQRCodeImage()`).
 - Získání instance objektu [Endroid\QrCode\QrCode](https://github.com/endroid/qr-code) pro pokročilé úpravy (`$qrInvoice->getQRCodeInstance()`).
+- Vložení loga do středu QR kódu: oficiální logo ČBA „QR Platba“ (`withDefaultLogo`) i libovolné vlastní firemní logo (`setLogo`).
 - Podpora pro české i slovenské bankovní účty (automatický převod na IBAN: `setAccount`, `setSlovakAccount`) i přímé zadání IBAN/BIC.
 - Podpora pro standard **SEPA EPC QR Code** (EPC069-12) pro platby v rámci celé **Eurozóny** (`Standard::Epc`).
 - Podpora pro měnu CZK i ostatní světové měny dle ISO 4217 pomocí `setCurrency(Currency::CZK)`.
@@ -178,6 +179,44 @@ $qr->setStandard(Standard::Epc)
 // Vrátí EPC řetězec nebo rovnou HTML <img> tag s QR kódem:
 echo $qr->getQRCodeImage();
 ```
+
+---
+
+## Vložení loga do QR kódu
+
+Knihovna umožňuje do středu QR kódu vložit buď oficiální doporučené logo ČBA **„QR Platba“**, nebo libovolné **vlastní firemní logo**. Při použití loga knihovna automaticky nastaví úroveň korekce chyb na `High` (30 % redundance), aby byl kód vždy bez problémů naskenovatelný.
+
+### 1. Oficiální logo ČBA („QR Platba“)
+
+Pro vložení oficiálního loga ČBA stačí zavolat metodu `withDefaultLogo()`:
+
+```php
+$qr = new QRInvoice()
+    ->setAccount('27-16060243/0300')
+    ->setAmount(500.00)
+    ->setMessage('Platba s logem ČBA')
+    ->withDefaultLogo(55); // Nastaví oficiální logo ČBA o velikosti 55x55 px
+
+echo $qr->getQRCodeImage();
+```
+
+<img src="readme/qr_cba_logo.png" width="220" alt="QR Platba s logem ČBA" />
+
+### 2. Vlastní firemní logo
+
+Do středu kódu můžete umístit jakýkoli vlastní PNG obrázek či logo vaší společnosti:
+
+```php
+$qr = new QRInvoice()
+    ->setAccount('27-16060243/0300')
+    ->setAmount(1250.00)
+    ->setMessage('Platba s vlastním logem')
+    ->setLogo(__DIR__ . '/cesta/k/firemni-logo.png', width: 55, height: 55);
+
+echo $qr->getQRCodeImage();
+```
+
+<img src="readme/qr_custom_logo.png" width="220" alt="QR Platba s vlastním logem" />
 
 ---
 

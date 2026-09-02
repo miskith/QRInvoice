@@ -15,6 +15,8 @@ use DateTime;
 use Endroid\QrCode\Color\Color as QrColor;
 use Endroid\QrCode\Encoding\Encoding as QrEncoding;
 use Endroid\QrCode\ErrorCorrectionLevel as QrErrorCorrectionLevel;
+use Endroid\QrCode\Logo\Logo as QrLogo;
+use Endroid\QrCode\Logo\LogoInterface;
 use Endroid\QrCode\QrCode;
 use Endroid\QrCode\RoundBlockSizeMode as QrRoundBlockSizeMode;
 use Endroid\QrCode\Writer\BinaryWriter as QrBinaryWriter;
@@ -210,6 +212,11 @@ class QRInvoice
 	private ?string $remittanceReference = null;
 
 	/**
+	 * Instance loga pro umístění do středu QR kódu.
+	 */
+	private ?LogoInterface $logo = null;
+
+	/**
 	 * Konstruktor nové platby.
 	 *
 	 * @throws \InvalidArgumentException
@@ -328,6 +335,68 @@ class QRInvoice
 	public function getRemittanceReference(): ?string
 	{
 		return $this->remittanceReference;
+	}
+
+	/**
+	 * Nastavení loga v centru QR kódu.
+	 *
+	 * @param LogoInterface|string|null $logo Cesta k souboru s obrázkem nebo instance LogoInterface
+	 * @param int|null $width Šířka loga v px (výchozí: 50)
+	 * @param int|null $height Výška loga v px (výchozí: 50)
+	 * @param bool $punchoutBackground Zda vystřihnout bílé pozadí pod logem
+	 * @throws QRInvoiceException
+	 */
+	public function setLogo(
+		LogoInterface | string | null $logo,
+		?int $width = 50,
+		?int $height = 50,
+		bool $punchoutBackground = false,
+	): QRInvoice {
+		if ($logo === null) {
+			$this->logo = null;
+
+			return $this;
+		}
+
+		if ($logo instanceof LogoInterface) {
+			$this->logo = $logo;
+
+			return $this;
+		}
+
+		if (!file_exists($logo)) {
+			throw new QRInvoiceException(sprintf('Logo file "%s" does not exist.', $logo));
+		}
+
+		$this->logo = new QrLogo(
+			path: $logo,
+			resizeToWidth: $width,
+			resizeToHeight: $height,
+			punchoutBackground: $punchoutBackground,
+		);
+
+		return $this;
+	}
+
+	/**
+	 * Nastavení oficiálního loga ČBA „QR Platba“ do středu QR kódu.
+	 *
+	 * @param int $size Velikost loga v px (výchozí: 50)
+	 * @throws QRInvoiceException
+	 */
+	public function withDefaultLogo(int $size = 50): QRInvoice
+	{
+		$path = __DIR__ . '/../resources/qr-platba-logo.png';
+
+		return $this->setLogo($path, $size, $size);
+	}
+
+	/**
+	 * Získání instance loga.
+	 */
+	public function getLogo(): ?LogoInterface
+	{
+		return $this->logo;
 	}
 
 	/**
@@ -1139,7 +1208,7 @@ class QRInvoice
 	{
 		$qrCode = $this->getQRCodeInstance($size, $margin);
 		$writer = new QrPngWriter();
-		$data = $writer->write($qrCode)->getDataUri();
+		$data = $writer->write($qrCode, $this->logo)->getDataUri();
 
 		return $htmlTag
 			? sprintf('<img src="%s" width="%2$d" height="%2$d" alt="QR Platba" />', $data, $size)
@@ -1153,8 +1222,8 @@ class QRInvoice
 	 * @param Format|string $format Doporučeno předávat Format enum. Předávání textového řetězce je deprecated a v budoucí verzi bude odstraněno.
 	 * @param int $size Velikost v px (výchozí: 300)
 	 * @param int $margin Okraj v px (výchozí: 10)
-	 * @throws \Endroid\QrCode\Exception\UnsupportedExtensionException
 	 * @throws QRInvoiceException
+	 * @throws \Exception
 	 */
 	public function saveQRCodeImage(?string $filename = null, Format | string $format = Format::Png, int $size = 300, int $margin = 10): QRInvoice
 	{
@@ -1177,7 +1246,7 @@ class QRInvoice
 			default => throw new QRInvoiceException('Unknown file format'),
 		};
 
-		$writer->write($qrCode)->saveToFile($filename);
+		$writer->write($qrCode, $this->logo)->saveToFile($filename);
 
 		return $this;
 	}
@@ -1187,11 +1256,13 @@ class QRInvoice
 	 */
 	public function getQRCodeInstance(int $size = 300, int $margin = 10): QrCode
 	{
+		$errorCorrection = $this->logo !== null ? QrErrorCorrectionLevel::High : QrErrorCorrectionLevel::Medium;
+
 		return new QrCode(
 			data: (string) $this,
 			size: $size - ($margin * 2),
 			encoding: new QrEncoding('UTF-8'),
-			errorCorrectionLevel: QrErrorCorrectionLevel::Medium,
+			errorCorrectionLevel: $errorCorrection,
 			margin: $margin,
 			roundBlockSizeMode: QrRoundBlockSizeMode::Enlarge,
 			foregroundColor: new QrColor(0, 0, 0, 0),

@@ -629,4 +629,44 @@ class QRPlatbaTest extends TestCase
 		$img = $qr->getQRCodeImage();
 		$this->assertStringStartsWith('<img src="data:image/png;base64,', $img);
 	}
+
+	public function testWithDefaultLogo(): void
+	{
+		$qr = new QRInvoice();
+		$qr->setAccount('27-16060243/0300')
+			->setAmount(100.00)
+			->withDefaultLogo(45);
+
+		$this->assertNotNull($qr->getLogo());
+		$this->assertStringContainsString('qr-platba-logo.png', $qr->getLogo()->getPath());
+		$this->assertSame(45, $qr->getLogo()->getResizeToWidth());
+		$this->assertSame(45, $qr->getLogo()->getResizeToHeight());
+
+		$img = $qr->getQRCodeImage();
+		$this->assertStringStartsWith('<img src="data:image/png;base64,', $img);
+	}
+
+	public function testSetCustomLogo(): void
+	{
+		$qr = new QRInvoice();
+		$qr->setAccount('27-16060243/0300')
+			->setAmount(100.00)
+			->setLogo(__DIR__ . '/../readme/sample-logo.png', 60, 60);
+
+		$this->assertNotNull($qr->getLogo());
+		$this->assertSame(60, $qr->getLogo()->getResizeToWidth());
+
+		$qr->setLogo(null);
+		$this->assertNull($qr->getLogo());
+	}
+
+	public function testSetLogoThrowsOnNonExistentFile(): void
+	{
+		$qr = new QRInvoice();
+
+		$this->expectException(QRInvoiceException::class);
+		$this->expectExceptionMessage('does not exist');
+
+		$qr->setLogo('non_existent_file_path.png');
+	}
 }
