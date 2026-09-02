@@ -191,11 +191,26 @@ class QRPlatbaTest extends TestCase
 			->setCurrency('CZK')
 			->setCRC32(true);
 
-		$expectedCrc = '68C736E0';
+		$expectedCrc = '15EF68DE';
 		$this->assertSame($expectedCrc, $qr->getCRC32());
 		$this->assertSame($expectedCrc, $qr->calculateSpdCrc32());
 		$this->assertSame(
 			'SPD*1.0*ACC:CZ0301000000123456789012*AM:1234.56*CC:CZK*MSG:Duakritics*X-VS:2016001234*CRC32:' . $expectedCrc,
+			$qr->__toString(),
+		);
+	}
+
+	public function testCrc32OfficialSpecificationExample(): void
+	{
+		$qr = new QRInvoice()
+			->setIban('CZ5855000000001265098001')
+			->setAmount(100.00)
+			->setCurrency('CZK')
+			->setCRC32(true);
+
+		$this->assertSame('AAD80227', $qr->getCRC32());
+		$this->assertSame(
+			'SPD*1.0*ACC:CZ5855000000001265098001*AM:100.00*CC:CZK*CRC32:AAD80227',
 			$qr->__toString(),
 		);
 	}

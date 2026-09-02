@@ -599,12 +599,12 @@ class QRInvoice
 
 		ksort($attributes);
 
-		$canonical = 'SPD*' . self::SPD_VERSION . '*';
+		$chunks = ['SPD', self::SPD_VERSION];
 		foreach ($attributes as $key => $value) {
-			$canonical .= $key . ':' . $value . '*';
+			$chunks[] = $key . ':' . $value;
 		}
 
-		return strtoupper(sprintf('%08x', crc32($canonical)));
+		return strtoupper(sprintf('%08x', crc32(implode('*', $chunks))));
 	}
 
 	/**
@@ -646,21 +646,16 @@ class QRInvoice
 
 		// QR Platba
 		if ($this->isOnlyInvoice === false) {
-			$spdCrc = $this->spd_keys['CRC32'] === true ? $this->calculateSpdCrc32() : null;
-
 			$chunks = ['SPD', self::SPD_VERSION];
 			foreach ($this->spd_keys as $key => $value) {
-				if ($key === 'CRC32') {
-					if ($spdCrc !== null) {
-						$chunks[] = 'CRC32:' . $spdCrc;
-					}
-
-					continue;
-				}
-				if (null === $value) {
+				if ($key === 'CRC32' || null === $value) {
 					continue;
 				}
 				$chunks[] = $key . ':' . $value;
+			}
+
+			if ($this->spd_keys['CRC32'] === true) {
+				$chunks[] = 'CRC32:' . $this->calculateSpdCrc32();
 			}
 
 			$encoded_string .= implode('*', $chunks);
@@ -668,18 +663,10 @@ class QRInvoice
 
 		// QR Faktura
 		if (!is_null($this->sid_keys['ID']) && !is_null($this->sid_keys['DD'])) {
-			$sidCrc = $this->sid_keys['CRC32'] === true ? $this->calculateSidCrc32() : null;
-
 			$chunks = ['SID', self::SID_VERSION];
 			foreach ($this->sid_keys as $key => $value) {
-				if ($key === 'CRC32') {
-					if ($sidCrc !== null) {
-						$chunks[] = 'CRC32:' . $sidCrc;
-					}
-
-					continue;
-				}
 				if (
+					$key === 'CRC32' ||
 					null === $value ||
 					($this->isOnlyInvoice === false && (
 						(isset($this->spd_keys[$key]) && $this->spd_keys[$key] === $value) ||
@@ -689,6 +676,10 @@ class QRInvoice
 					continue;
 				}
 				$chunks[] = $key . ':' . $value;
+			}
+
+			if ($this->sid_keys['CRC32'] === true) {
+				$chunks[] = 'CRC32:' . $this->calculateSidCrc32();
 			}
 
 			if ($this->isOnlyInvoice === false) {
