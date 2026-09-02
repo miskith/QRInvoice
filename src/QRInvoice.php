@@ -561,6 +561,83 @@ class QRInvoice
 	}
 
 	/**
+	 * Nastavení kontrolního součtu CRC32.
+	 * Při předání true se kontrolní součet automaticky spočítá dle specifikace.
+	 */
+	public function setCRC32(bool $crc32 = true): QRInvoice
+	{
+		$this->spd_keys['CRC32'] = $crc32 ? true : null;
+		$this->sid_keys['CRC32'] = $crc32 ? true : null;
+
+		return $this;
+	}
+
+	/**
+	 * Získání vypočteného CRC32 kontrolního součtu (pokud je aktivní).
+	 */
+	public function getCRC32(): ?string
+	{
+		if ($this->isOnlyInvoice) {
+			return $this->sid_keys['CRC32'] === true ? $this->calculateSidCrc32() : null;
+		}
+
+		return $this->spd_keys['CRC32'] === true ? $this->calculateSpdCrc32() : null;
+	}
+
+	/**
+	 * Spočítá CRC32 kontrolní součet pro QR Platbu (SPD) dle kanonické reprezentace.
+	 */
+	public function calculateSpdCrc32(): string
+	{
+		$attributes = [];
+		foreach ($this->spd_keys as $key => $value) {
+			if ($key === 'CRC32' || null === $value) {
+				continue;
+			}
+			$attributes[$key] = (string) $value;
+		}
+
+		ksort($attributes);
+
+		$canonical = 'SPD*' . self::SPD_VERSION . '*';
+		foreach ($attributes as $key => $value) {
+			$canonical .= $key . ':' . $value . '*';
+		}
+
+		return strtoupper(sprintf('%08x', crc32($canonical)));
+	}
+
+	/**
+	 * Spočítá CRC32 kontrolní součet pro QR Fakturu (SID) dle kanonické reprezentace.
+	 */
+	public function calculateSidCrc32(): string
+	{
+		$attributes = [];
+		foreach ($this->sid_keys as $key => $value) {
+			if (
+				$key === 'CRC32' ||
+				null === $value ||
+				($this->isOnlyInvoice === false && (
+					(isset($this->spd_keys[$key]) && $this->spd_keys[$key] === $value) ||
+					(isset($this->spd_keys['X-' . $key]) && $this->spd_keys['X-' . $key] === $value)
+				))
+			) {
+				continue;
+			}
+			$attributes[$key] = (string) $value;
+		}
+
+		ksort($attributes);
+
+		$canonical = 'SID*' . self::SID_VERSION . '*';
+		foreach ($attributes as $key => $value) {
+			$canonical .= $key . ':' . $value . '*';
+		}
+
+		return strtoupper(sprintf('%08x', crc32($canonical)));
+	}
+
+	/**
 	 * Metoda vrátí QR Platbu nebo Fakturu s integrovanou QR Platbou jako textový řetězec.
 	 */
 	public function __toString(): string
@@ -569,36 +646,55 @@ class QRInvoice
 
 		// QR Platba
 		if ($this->isOnlyInvoice === false) {
+			$spdCrc = $this->spd_keys['CRC32'] === true ? $this->calculateSpdCrc32() : null;
+
 			$chunks = ['SPD', self::SPD_VERSION];
 			foreach ($this->spd_keys as $key => $value) {
+				if ($key === 'CRC32') {
+					if ($spdCrc !== null) {
+						$chunks[] = 'CRC32:' . $spdCrc;
+					}
+
+					continue;
+				}
 				if (null === $value) {
 					continue;
 				}
-				$chunks[] = $key.':'.$value;
+				$chunks[] = $key . ':' . $value;
 			}
+
 			$encoded_string .= implode('*', $chunks);
 		}
 
 		// QR Faktura
 		if (!is_null($this->sid_keys['ID']) && !is_null($this->sid_keys['DD'])) {
+			$sidCrc = $this->sid_keys['CRC32'] === true ? $this->calculateSidCrc32() : null;
+
 			$chunks = ['SID', self::SID_VERSION];
 			foreach ($this->sid_keys as $key => $value) {
+				if ($key === 'CRC32') {
+					if ($sidCrc !== null) {
+						$chunks[] = 'CRC32:' . $sidCrc;
+					}
+
+					continue;
+				}
 				if (
 					null === $value ||
 					($this->isOnlyInvoice === false && (
 						(isset($this->spd_keys[$key]) && $this->spd_keys[$key] === $value) ||
-						(isset($this->spd_keys['X-'.$key]) && $this->spd_keys['X-'.$key] === $value)
+						(isset($this->spd_keys['X-' . $key]) && $this->spd_keys['X-' . $key] === $value)
 					))
 				) {
 					continue;
 				}
-				$chunks[] = $key.':'.$value;
+				$chunks[] = $key . ':' . $value;
 			}
 
 			if ($this->isOnlyInvoice === false) {
-				$encoded_string .= '*X-INV:'.implode('%2A', $chunks).'*';
+				$encoded_string .= '*X-INV:' . implode('%2A', $chunks) . '*';
 			} else {
-				$encoded_string .= implode('*', $chunks).'*';
+				$encoded_string .= implode('*', $chunks) . '*';
 			}
 		}
 

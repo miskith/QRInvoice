@@ -183,4 +183,48 @@ class QRPlatbaTest extends TestCase
 			$string->__toString(),
 		);
 	}
+
+	public function testCrc32AutomaticCalculation(): void
+	{
+		$qr = QRInvoice::create('12-3456789012/0100', '1234.56', '2016001234')
+			->setMessage('Düakrítičs')
+			->setCurrency('CZK')
+			->setCRC32(true);
+
+		$expectedCrc = '68C736E0';
+		$this->assertSame($expectedCrc, $qr->getCRC32());
+		$this->assertSame($expectedCrc, $qr->calculateSpdCrc32());
+		$this->assertSame(
+			'SPD*1.0*ACC:CZ0301000000123456789012*AM:1234.56*CC:CZK*MSG:Duakritics*X-VS:2016001234*CRC32:' . $expectedCrc,
+			$qr->__toString(),
+		);
+	}
+
+	public function testCrc32DefaultParam(): void
+	{
+		$qr = QRInvoice::create('12-3456789012/0100', '1234.56', '2016001234')
+			->setCRC32();
+
+		$this->assertNotNull($qr->getCRC32());
+		$this->assertStringContainsString('CRC32:' . $qr->getCRC32(), $qr->__toString());
+	}
+
+	public function testCrc32Disable(): void
+	{
+		$qr = QRInvoice::create('12-3456789012/0100', '1234.56', '2016001234')
+			->setCRC32(true)
+			->setCRC32(false);
+
+		$this->assertNull($qr->getCRC32());
+		$this->assertStringNotContainsString('CRC32', $qr->__toString());
+	}
+
+	public function testCrc32AliasMethods(): void
+	{
+		$qr = QRInvoice::create('12-3456789012/0100', '1234.56', '2016001234')
+			->setCrc32(true);
+
+		$this->assertNotNull($qr->getCrc32());
+		$this->assertSame($qr->getCRC32(), $qr->getCrc32());
+	}
 }

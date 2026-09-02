@@ -147,4 +147,47 @@ class QRInvoiceTest extends TestCase
 			$string->__toString(),
 		);
 	}
+
+	public function testSimpleInvoiceWithCrc32(): void
+	{
+		$qr = QRInvoice::create('12-3456789012/0100', '1234.56', '2016001234')
+			->setMessage('Düakrítičs')
+			->setInvoiceId('123456789')
+			->setInvoiceDate(new DateTime('2021-07-15'))
+			->setCRC32(true);
+
+		$spdCrc = $qr->calculateSpdCrc32();
+		$sidCrc = $qr->calculateSidCrc32();
+
+		$this->assertSame($spdCrc, $qr->getCRC32());
+		$this->assertNotEmpty($sidCrc);
+
+		$expected = sprintf(
+			'SPD*1.0*ACC:CZ0301000000123456789012*AM:1234.56*CC:CZK*MSG:Duakritics*X-VS:2016001234*CRC32:%s*X-INV:SID%%2A1.0%%2AID:123456789%%2ADD:20210715%%2ACRC32:%s*',
+			$spdCrc,
+			$sidCrc,
+		);
+
+		$this->assertSame($expected, $qr->__toString());
+	}
+
+	public function testSimpleOnlyInvoiceWithCrc32(): void
+	{
+		$qr = QRInvoice::create('12-3456789012/0100', '1234.56', '2016001234')
+			->setIsOnlyInvoice(true)
+			->setMessage('Düakrítičs')
+			->setInvoiceId('123456789')
+			->setInvoiceDate(new DateTime('2021-07-15'))
+			->setCRC32(true);
+
+		$sidCrc = $qr->calculateSidCrc32();
+		$this->assertSame($sidCrc, $qr->getCRC32());
+
+		$expected = sprintf(
+			'SID*1.0*ID:123456789*DD:20210715*AM:1234.56*MSG:Duakritics*VS:2016001234*CC:CZK*ACC:CZ0301000000123456789012*CRC32:%s*',
+			$sidCrc,
+		);
+
+		$this->assertSame($expected, $qr->__toString());
+	}
 }
