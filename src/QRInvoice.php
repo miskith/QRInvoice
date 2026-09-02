@@ -1370,6 +1370,27 @@ class QRInvoice
 	}
 
 	/**
+	 * Metoda vrátí čistý vektorový SVG řetězec pro přímé vložení do šablony (HTML/Latte/Blade) nebo uložení.
+	 *
+	 * @param int $size Velikost v px (výchozí: 300)
+	 * @param int $margin Okraj v px (výchozí: 10)
+	 * @param bool $excludeXmlDeclaration Zda vynechat hlavičku <?xml version="1.0"?> pro přímé inline HTML vložení (výchozí: false)
+	 */
+	public function getSvg(int $size = 300, int $margin = 10, bool $excludeXmlDeclaration = false): string
+	{
+		$qrCode = $this->getQRCodeInstance($size, $margin);
+		$writer = new QrSvgWriter();
+
+		return $writer->write(
+			$qrCode,
+			$this->logo,
+			options: [
+				QrSvgWriter::WRITER_OPTION_EXCLUDE_XML_DECLARATION => $excludeXmlDeclaration,
+			],
+		)->getString();
+	}
+
+	/**
 	 * Uložení QR kódu do souboru.
 	 *
 	 * @param string|null $filename Cesta k cílovému souboru

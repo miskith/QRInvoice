@@ -750,4 +750,44 @@ class QRPlatbaTest extends TestCase
 
 		$qr->setForegroundColor(255);
 	}
+
+	public function testGetSvgString(): void
+	{
+		$qr = new QRInvoice();
+		$qr->setAccount('27-16060243/0300')
+			->setAmount(500.00);
+
+		$svg = $qr->getSvg();
+		$this->assertStringStartsWith('<?xml version="1.0"?>', $svg);
+		$this->assertStringContainsString('<svg xmlns="http://www.w3.org/2000/svg"', $svg);
+		$this->assertStringContainsString('</svg>', $svg);
+	}
+
+	public function testGetSvgStringWithoutXmlDeclaration(): void
+	{
+		$qr = new QRInvoice();
+		$qr->setAccount('27-16060243/0300')
+			->setAmount(500.00);
+
+		$svg = $qr->getSvg(excludeXmlDeclaration: true);
+		$this->assertStringStartsNotWith('<?xml', $svg);
+		$this->assertStringStartsWith('<svg xmlns="http://www.w3.org/2000/svg"', $svg);
+		$this->assertStringContainsString('</svg>', $svg);
+	}
+
+	public function testGetSvgWithColorsAndLogo(): void
+	{
+		$qr = new QRInvoice();
+		$qr->setAccount('27-16060243/0300')
+			->setAmount(500.00)
+			->setForegroundColor('#0F172A')
+			->setBackgroundColor('#F8FAFC')
+			->withDefaultLogo(40);
+
+		$svg = $qr->getSvg();
+		$this->assertStringContainsString('fill="#f8fafc"', $svg);
+		$this->assertStringContainsString('fill="#0f172a"', $svg);
+		$this->assertStringContainsString('<image', $svg);
+		$this->assertStringContainsString('data:image/png;base64,', $svg);
+	}
 }

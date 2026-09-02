@@ -21,6 +21,7 @@ QR platba zjednodušuje koncovému uživateli provedení příkazu k úhradě v 
 - Podpora pro výpočet kontrolního součtu **CRC32** z kanonického řetězce dle specifikace ČBA a KDP ČR (`$qrInvoice->setCRC32(true)`).
 - Zobrazení HTML `<img>` tagu obsahujícího rovnou `data-uri` s QR kódem bez nutnosti ukládat soubor na disk (`$qrInvoice->getQRCodeImage()`).
 - Získání čistého `data-uri` řetězce (`$qrInvoice->getQRCodeImage(false)`).
+- Přímé vrácení čistého vektorového **SVG řetězce** pro inline vložení do šablon (HTML, Latte, Blade, Twig) bez nutnosti ukládat na disk (`$qrInvoice->getSvg()`).
 - Uložení do souboru v široké škále formátů: **PNG, SVG, PDF, EPS, WebP, GIF, binární** (`$qrInvoice->saveQRCodeImage()`).
 - Získání instance objektu [Endroid\QrCode\QrCode](https://github.com/endroid/qr-code) pro pokročilé úpravy (`$qrInvoice->getQRCodeInstance()`).
 - Vložení loga do středu QR kódu: oficiální logo ČBA „QR Platba“ (`withDefaultLogo`) i libovolné vlastní firemní logo (`setLogo`).
@@ -372,6 +373,18 @@ $qrInvoice->saveQRCodeImage('qrcode.bin', Format::Binary, 300);
 ```php
 // Vrátí řetězec ve formátu: data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA...
 $dataUri = $qrInvoice->getQRCodeImage(false);
+```
+
+### Přímé vrácení čistého SVG (vektorový kód)
+
+Pokud nepotřebujete ukládat soubor na disk ani vkládat Base64 `<img>` tag, můžete získat čistý SVG kód pro přímé vložení do šablon (Latte, Blade, Twig):
+
+```php
+// Standardní SVG včetně hlavičky <?xml version="1.0"?>:
+$svg = $qrInvoice->getSvg();
+
+// Inline SVG pro přímé vložení do HTML (bez hlavičky <?xml...>):
+$inlineSvg = $qrInvoice->getSvg(excludeXmlDeclaration: true);
 ```
 
 ### Získání textového SPAYD / SID řetězce
