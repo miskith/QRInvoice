@@ -45,7 +45,7 @@
 			"./vendor/bin/phpunit"
 		],
 		"phpstan": [
-			"phpstan analyse"
+			"phpstan analyse --memory-limit=512M"
 		],
 		"rector": [
 			"rector process"

@@ -11,7 +11,6 @@ declare(strict_types=1);
  * please view LICENSE.
  */
 
-use Endroid\QrCode\QrCode;
 use miskith\QRInvoice\Enum\Currency;
 use miskith\QRInvoice\Enum\Format;
 use miskith\QRInvoice\Enum\PaymentType;
@@ -83,7 +82,7 @@ final class QRPlatbaTest extends TestCase
 			->setMessage('QR platba je parádní!')
 			->getQRCodeInstance();
 
-		$this->assertInstanceOf(QrCode::class, $qrInvoice);
+		$this->assertSame(280, $qrInvoice->getSize());
 	}
 
 	public function testQrCodeBase64Instante(): void
@@ -241,13 +240,14 @@ final class QRPlatbaTest extends TestCase
 		$this->assertStringNotContainsString('CRC32', $qr->__toString());
 	}
 
-	public function testCrc32AliasMethods(): void
+	public function testCrc32(): void
 	{
 		$qr = QRInvoice::create('12-3456789012/0100', '1234.56', '2016001234')
-			->setCrc32(true);
+			->setCRC32(true);
 
-		$this->assertNotNull($qr->getCrc32());
-		$this->assertSame($qr->getCRC32(), $qr->getCrc32());
+		$crc = $qr->getCRC32();
+		$this->assertNotNull($crc);
+		$this->assertSame(8, strlen($crc));
 	}
 
 	public function testInstantPayment(): void
@@ -707,6 +707,8 @@ final class QRPlatbaTest extends TestCase
 		$qr->setAccount('27-16060243/0300');
 
 		$qr->setColors('#1E293B', '#F8FAFC');
+		$this->assertInstanceOf(Endroid\QrCode\Color\Color::class, $qr->getForegroundColor());
+		$this->assertInstanceOf(Endroid\QrCode\Color\Color::class, $qr->getBackgroundColor());
 		$this->assertSame(30, $qr->getForegroundColor()->getRed());
 		$this->assertSame(248, $qr->getBackgroundColor()->getRed());
 

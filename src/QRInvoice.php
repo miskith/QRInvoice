@@ -54,30 +54,7 @@ class QRInvoice implements \Stringable
 	public const string SID_VERSION = '1.0';
 
 	/**
-	 * @var array<string>
-	 */
-	private static array $currencies = [
-		'AED', 'AFN', 'ALL', 'AMD', 'ANG', 'AOA', 'ARS', 'AUD', 'AWG', 'AZN',
-		'BAM', 'BBD', 'BDT', 'BGN', 'BHD', 'BIF', 'BMD', 'BND', 'BOB', 'BRL',
-		'BSD', 'BTN', 'BWP', 'BYN', 'BZD', 'CAD', 'CDF', 'CHF', 'CLP', 'CNY',
-		'COP', 'CRC', 'CUC', 'CUP', 'CVE', 'CZK', 'DJF', 'DKK', 'DOP', 'DZD',
-		'EGP', 'ERN', 'ETB', 'EUR', 'FJD', 'FKP', 'GBP', 'GEL', 'GGP', 'GHS',
-		'GIP', 'GMD', 'GNF', 'GTQ', 'GYD', 'HKD', 'HNL', 'HRK', 'HTG', 'HUF',
-		'IDR', 'ILS', 'IMP', 'INR', 'IQD', 'IRR', 'ISK', 'JEP', 'JMD', 'JOD',
-		'JPY', 'KES', 'KGS', 'KHR', 'KMF', 'KPW', 'KRW', 'KWD', 'KYD', 'KZT',
-		'LAK', 'LBP', 'LKR', 'LRD', 'LSL', 'LYD', 'MAD', 'MDL', 'MGA', 'MKD',
-		'MMK', 'MNT', 'MOP', 'MRO', 'MUR', 'MVR', 'MWK', 'MXN', 'MYR', 'MZN',
-		'NAD', 'NGN', 'NIO', 'NOK', 'NPR', 'NZD', 'OMR', 'PAB', 'PEN', 'PGK',
-		'PHP', 'PKR', 'PLN', 'PYG', 'QAR', 'RON', 'RSD', 'RUB', 'RWF', 'SAR',
-		'SBD', 'SCR', 'SDG', 'SEK', 'SGD', 'SHP', 'SLL', 'SOS', 'SPL', 'SRD',
-		'STD', 'SVC', 'SYP', 'SZL', 'THB', 'TJS', 'TMT', 'TND', 'TOP', 'TRY',
-		'TTD', 'TVD', 'TWD', 'TZS', 'UAH', 'UGX', 'USD', 'UYU', 'UZS', 'VEF',
-		'VND', 'VUV', 'WST', 'XAF', 'XCD', 'XDR', 'XOF', 'XPF', 'YER', 'ZAR',
-		'ZMW', 'ZWD',
-	];
-
-	/**
-	 * @var array<string, string|bool|null> klíče QR Platby
+	 * @var array<string, string|int|bool|null> klíče QR Platby
 	 */
 	private array $spd_keys = [
 		'ACC' => null,
@@ -119,7 +96,7 @@ class QRInvoice implements \Stringable
 	];
 
 	/**
-	 * @var array<string, string|bool|null> klíče QR Faktury
+	 * @var array<string, string|int|bool|null> klíče QR Faktury
 	 */
 	private array $sid_keys = [
 		'ID' => null,
@@ -242,7 +219,7 @@ class QRInvoice implements \Stringable
 	 */
 	public function __construct(?string $account = null, int | float | string | null $amount = null, ?string $variable = null, Currency | string | null $currency = null)
 	{
-		if ($account) {
+		if ($account !== null && $account !== '') {
 			str_contains($account, '/') ? $this->setAccount($account) : $this->setIban($account);
 		}
 
@@ -250,11 +227,11 @@ class QRInvoice implements \Stringable
 			$this->setAmount($amount);
 		}
 
-		if ($variable) {
+		if ($variable !== null && $variable !== '') {
 			$this->setVariableSymbol($variable);
 		}
 
-		if ($currency) {
+		if ($currency !== null) {
 			$this->setCurrency($currency);
 		}
 	}
@@ -412,7 +389,7 @@ class QRInvoice implements \Stringable
 		Currency | string | null $currency = null,
 	): QRInvoice {
 		$vs = $variable;
-		if ($vs === null && preg_match('/[0-9]{1,10}/', $invoiceId, $m)) {
+		if ($vs === null && preg_match('/[0-9]{1,10}/', $invoiceId, $m) === 1) {
 			$vs = $m[0];
 		}
 
@@ -586,7 +563,7 @@ class QRInvoice implements \Stringable
 
 		$unstructured = $lines[10] ?? '';
 		if ($unstructured !== '') {
-			if (preg_match('/^VS:([0-9]{1,10})\s*(.*)$/', $unstructured, $matches)) {
+			if (preg_match('/^VS:([0-9]{1,10})\s*(.*)$/', $unstructured, $matches) === 1) {
 				$qr->setVariableSymbol($matches[1]);
 				if ($matches[2] !== '') {
 					$qr->setMessage($matches[2]);
@@ -628,7 +605,9 @@ class QRInvoice implements \Stringable
 	 */
 	public function getAccount(): ?string
 	{
-		return $this->spd_keys['ACC'] ?? $this->sid_keys['ACC'] ?? null;
+		$val = $this->spd_keys['ACC'] ?? $this->sid_keys['ACC'] ?? null;
+
+		return is_string($val) ? $val : null;
 	}
 
 	/**
@@ -670,7 +649,9 @@ class QRInvoice implements \Stringable
 	 */
 	public function getCurrencyString(): ?string
 	{
-		return $this->spd_keys['CC'] ?? $this->sid_keys['CC'] ?? null;
+		$val = $this->spd_keys['CC'] ?? $this->sid_keys['CC'] ?? null;
+
+		return is_string($val) ? $val : null;
 	}
 
 	/**
@@ -678,7 +659,9 @@ class QRInvoice implements \Stringable
 	 */
 	public function getVariableSymbol(): ?string
 	{
-		return $this->spd_keys['X-VS'] ?? $this->sid_keys['VS'] ?? null;
+		$val = $this->spd_keys['X-VS'] ?? $this->sid_keys['VS'] ?? null;
+
+		return is_string($val) ? $val : null;
 	}
 
 	/**
@@ -686,7 +669,9 @@ class QRInvoice implements \Stringable
 	 */
 	public function getConstantSymbol(): ?string
 	{
-		return $this->spd_keys['X-KS'] ?? null;
+		$val = $this->spd_keys['X-KS'] ?? null;
+
+		return is_string($val) ? $val : null;
 	}
 
 	/**
@@ -694,7 +679,9 @@ class QRInvoice implements \Stringable
 	 */
 	public function getSpecificSymbol(): ?string
 	{
-		return $this->spd_keys['X-SS'] ?? null;
+		$val = $this->spd_keys['X-SS'] ?? null;
+
+		return is_string($val) ? $val : null;
 	}
 
 	/**
@@ -702,7 +689,9 @@ class QRInvoice implements \Stringable
 	 */
 	public function getMessage(): ?string
 	{
-		return $this->spd_keys['MSG'] ?? $this->sid_keys['MSG'] ?? null;
+		$val = $this->spd_keys['MSG'] ?? $this->sid_keys['MSG'] ?? null;
+
+		return is_string($val) ? $val : null;
 	}
 
 	/**
@@ -710,7 +699,9 @@ class QRInvoice implements \Stringable
 	 */
 	public function getRecipientName(): ?string
 	{
-		return $this->spd_keys['RN'] ?? null;
+		$val = $this->spd_keys['RN'] ?? null;
+
+		return is_string($val) ? $val : null;
 	}
 
 	/**
@@ -719,8 +710,13 @@ class QRInvoice implements \Stringable
 	public function getDueDate(): ?DateTime
 	{
 		$dt = $this->spd_keys['DT'] ?? $this->sid_keys['DT'] ?? null;
+		if (is_string($dt)) {
+			$d = DateTime::createFromFormat('Ymd', $dt);
 
-		return $dt !== null ? DateTime::createFromFormat('Ymd', $dt) ?: null : null;
+			return $d instanceof DateTime ? $d : null;
+		}
+
+		return null;
 	}
 
 	/**
@@ -730,7 +726,7 @@ class QRInvoice implements \Stringable
 	{
 		$pt = $this->spd_keys['PT'] ?? null;
 
-		return $pt !== null ? PaymentType::tryFrom($pt) : null;
+		return is_string($pt) ? PaymentType::tryFrom($pt) : null;
 	}
 
 	/**
@@ -746,7 +742,10 @@ class QRInvoice implements \Stringable
 	 */
 	public function getNotificationEmail(): ?string
 	{
-		return ($this->spd_keys['NT'] ?? null) === 'E' ? ($this->spd_keys['NTA'] ?? null) : null;
+		$nt = $this->spd_keys['NT'] ?? null;
+		$nta = $this->spd_keys['NTA'] ?? null;
+
+		return ($nt === 'E' && is_string($nta)) ? $nta : null;
 	}
 
 	/**
@@ -754,7 +753,10 @@ class QRInvoice implements \Stringable
 	 */
 	public function getNotificationPhone(): ?string
 	{
-		return ($this->spd_keys['NT'] ?? null) === 'P' ? ($this->spd_keys['NTA'] ?? null) : null;
+		$nt = $this->spd_keys['NT'] ?? null;
+		$nta = $this->spd_keys['NTA'] ?? null;
+
+		return ($nt === 'P' && is_string($nta)) ? $nta : null;
 	}
 
 	/**
@@ -762,7 +764,9 @@ class QRInvoice implements \Stringable
 	 */
 	public function getInternalId(): ?string
 	{
-		return $this->spd_keys['X-ID'] ?? null;
+		$val = $this->spd_keys['X-ID'] ?? null;
+
+		return is_string($val) ? $val : null;
 	}
 
 	/**
@@ -770,7 +774,9 @@ class QRInvoice implements \Stringable
 	 */
 	public function getUrl(): ?string
 	{
-		return $this->spd_keys['X-URL'] ?? null;
+		$val = $this->spd_keys['X-URL'] ?? null;
+
+		return is_string($val) ? $val : null;
 	}
 
 	/**
@@ -796,7 +802,9 @@ class QRInvoice implements \Stringable
 	 */
 	public function getInvoiceId(): ?string
 	{
-		return $this->sid_keys['ID'] ?? null;
+		$val = $this->sid_keys['ID'] ?? null;
+
+		return is_string($val) ? $val : null;
 	}
 
 	/**
@@ -805,8 +813,13 @@ class QRInvoice implements \Stringable
 	public function getInvoiceDate(): ?DateTime
 	{
 		$dd = $this->sid_keys['DD'] ?? null;
+		if (is_string($dd)) {
+			$d = DateTime::createFromFormat('Ymd', $dd);
 
-		return $dd !== null ? DateTime::createFromFormat('Ymd', $dd) ?: null : null;
+			return $d instanceof DateTime ? $d : null;
+		}
+
+		return null;
 	}
 
 	/**
@@ -815,8 +828,13 @@ class QRInvoice implements \Stringable
 	public function getTaxDate(): ?DateTime
 	{
 		$duzp = $this->sid_keys['DUZP'] ?? null;
+		if (is_string($duzp)) {
+			$d = DateTime::createFromFormat('Ymd', $duzp);
 
-		return $duzp !== null ? DateTime::createFromFormat('Ymd', $duzp) ?: null : null;
+			return $d instanceof DateTime ? $d : null;
+		}
+
+		return null;
 	}
 
 	/**
@@ -826,7 +844,7 @@ class QRInvoice implements \Stringable
 	{
 		$td = $this->sid_keys['TD'] ?? null;
 
-		return $td !== null ? InvoiceDocumentType::tryFrom($td) : null;
+		return (is_string($td) || is_int($td)) ? InvoiceDocumentType::tryFrom((int) $td) : null;
 	}
 
 	/**
@@ -836,7 +854,7 @@ class QRInvoice implements \Stringable
 	{
 		$tp = $this->sid_keys['TP'] ?? null;
 
-		return $tp !== null ? TaxPerformance::tryFrom((int) $tp) : null;
+		return (is_int($tp) || is_string($tp)) ? TaxPerformance::tryFrom((int) $tp) : null;
 	}
 
 	/**
@@ -844,7 +862,9 @@ class QRInvoice implements \Stringable
 	 */
 	public function getCompanyTaxId(): ?string
 	{
-		return $this->sid_keys['VII'] ?? null;
+		$val = $this->sid_keys['VII'] ?? null;
+
+		return is_string($val) ? $val : null;
 	}
 
 	/**
@@ -852,7 +872,9 @@ class QRInvoice implements \Stringable
 	 */
 	public function getCompanyRegistrationId(): ?string
 	{
-		return $this->sid_keys['INI'] ?? null;
+		$val = $this->sid_keys['INI'] ?? null;
+
+		return is_string($val) ? $val : null;
 	}
 
 	/**
@@ -860,7 +882,9 @@ class QRInvoice implements \Stringable
 	 */
 	public function getInvoiceSubjectTaxId(): ?string
 	{
-		return $this->sid_keys['VIR'] ?? null;
+		$val = $this->sid_keys['VIR'] ?? null;
+
+		return is_string($val) ? $val : null;
 	}
 
 	/**
@@ -868,7 +892,9 @@ class QRInvoice implements \Stringable
 	 */
 	public function getInvoiceSubjectRegistrationId(): ?string
 	{
-		return $this->sid_keys['INR'] ?? null;
+		$val = $this->sid_keys['INR'] ?? null;
+
+		return is_string($val) ? $val : null;
 	}
 
 	/**
@@ -878,7 +904,7 @@ class QRInvoice implements \Stringable
 	{
 		$this->standard = $standard instanceof Standard ? $standard : Standard::from(strtoupper($standard));
 
-		if ($this->standard === Standard::Epc && ($this->spd_keys['CC'] === 'CZK' || empty($this->spd_keys['CC']))) {
+		if ($this->standard === Standard::Epc && (in_array($this->spd_keys['CC'], ['CZK', null, ''], true))) {
 			$this->spd_keys['CC'] = 'EUR';
 		}
 
@@ -1144,7 +1170,12 @@ class QRInvoice implements \Stringable
 				throw new QRInvoiceException('RGB components (green and blue) must be provided when red is an integer.');
 			}
 
-			return new QrColor($colorOrRed, $green, $blue, $alpha);
+			$r = max(0, min(255, $colorOrRed));
+			$g = max(0, min(255, $green));
+			$b = max(0, min(255, $blue));
+			$a = max(0, min(127, $alpha));
+
+			return new QrColor($r, $g, $b, $a);
 		}
 
 		$hex = ltrim(trim($colorOrRed), '#');
@@ -1153,13 +1184,14 @@ class QRInvoice implements \Stringable
 			$hex = $hex[0] . $hex[0] . $hex[1] . $hex[1] . $hex[2] . $hex[2];
 		}
 
-		if (!preg_match('/^[0-9a-fA-F]{6}$/', $hex)) {
+		if (preg_match('/^[0-9a-fA-F]{6}$/', $hex) !== 1) {
 			throw new QRInvoiceException(sprintf('Invalid HEX color format: "%s". Expected format like "#4F46E5" or "#FFF".', $colorOrRed));
 		}
 
-		$red = (int) hexdec(substr($hex, 0, 2));
-		$green = (int) hexdec(substr($hex, 2, 2));
-		$blue = (int) hexdec(substr($hex, 4, 2));
+		$red = max(0, min(255, (int) hexdec(substr($hex, 0, 2))));
+		$green = max(0, min(255, (int) hexdec(substr($hex, 2, 2))));
+		$blue = max(0, min(255, (int) hexdec(substr($hex, 4, 2))));
+		$alpha = max(0, min(127, $alpha));
 
 		return new QrColor($red, $green, $blue, $alpha);
 	}
@@ -1398,7 +1430,7 @@ class QRInvoice implements \Stringable
 	 */
 	public function setNotificationEmail(string $email): QRInvoice
 	{
-		if (!filter_var($email, FILTER_VALIDATE_EMAIL) || mb_strlen($email) > 320) {
+		if (filter_var($email, FILTER_VALIDATE_EMAIL) === false || mb_strlen($email) > 320) {
 			throw new QRInvoiceException(sprintf('Invalid notification email "%s".', $email));
 		}
 
@@ -1416,7 +1448,7 @@ class QRInvoice implements \Stringable
 	public function setNotificationPhone(string $phone): QRInvoice
 	{
 		$cleanPhone = preg_replace('/\s+/', '', $phone) ?? '';
-		if (!preg_match('/^\+?[0-9]{9,15}$/', $cleanPhone) || mb_strlen($cleanPhone) > 320) {
+		if (preg_match('/^\+?[0-9]{9,15}$/', $cleanPhone) !== 1 || mb_strlen($cleanPhone) > 320) {
 			throw new QRInvoiceException(sprintf('Invalid notification phone "%s".', $phone));
 		}
 
@@ -1530,13 +1562,13 @@ class QRInvoice implements \Stringable
 	 *
 	 * @param InvoiceDocumentType|int $td Doporučeno předávat InvoiceDocumentType enum. Předávání celého čísla je deprecated a v budoucí verzi bude odstraněno.
 	 */
-	public function setInvoiceDocumentType(InvoiceDocumentType | int $td): QRInvoice
+	public function setInvoiceDocumentType(InvoiceDocumentType | int | string $td): QRInvoice
 	{
 		if (is_int($td)) {
 			@trigger_error('Passing int to setInvoiceDocumentType() is deprecated, use miskith\QRInvoice\Enum\InvoiceDocumentType enum instead.', E_USER_DEPRECATED);
 		}
 
-		$tdValue = $td instanceof InvoiceDocumentType ? $td->value : $td;
+		$tdValue = $td instanceof InvoiceDocumentType ? $td->value : (int) $td;
 		if (InvoiceDocumentType::tryFrom($tdValue) === null) {
 			throw new QRInvoiceException('Unknown invoice document type ID');
 		}
@@ -1859,8 +1891,8 @@ class QRInvoice implements \Stringable
 	 */
 	public function getEpcString(): string
 	{
-		$rawAccount = $this->spd_keys['ACC'] ?? '';
-		if (empty($rawAccount)) {
+		$rawAccount = is_string($this->spd_keys['ACC']) ? $this->spd_keys['ACC'] : '';
+		if ($rawAccount === '') {
 			throw new QRInvoiceException('IBAN or bank account is required for SEPA EPC QR code.');
 		}
 
@@ -1869,13 +1901,13 @@ class QRInvoice implements \Stringable
 
 		if (str_contains($rawAccount, '+')) {
 			[$iban, $accBic] = explode('+', $rawAccount, 2);
-			if (empty($bic)) {
+			if ($bic === '') {
 				$bic = $accBic;
 			}
 		}
 
-		$recipientName = $this->spd_keys['RN'] ?? '';
-		if (empty($recipientName)) {
+		$recipientName = is_string($this->spd_keys['RN']) ? $this->spd_keys['RN'] : '';
+		if ($recipientName === '') {
 			throw new QRInvoiceException('Recipient name (setRecipientName) is required for SEPA EPC QR code.');
 		}
 
@@ -1893,12 +1925,12 @@ class QRInvoice implements \Stringable
 		$ref = $this->remittanceReference ?? '';
 		$unstructured = '';
 
-		if (empty($ref)) {
-			$msg = $this->spd_keys['MSG'] ?? '';
-			$vs = $this->spd_keys['X-VS'] ?? '';
-			if (!empty($vs) && !empty($msg)) {
+		if ($ref === '') {
+			$msg = is_string($this->spd_keys['MSG']) ? $this->spd_keys['MSG'] : '';
+			$vs = is_string($this->spd_keys['X-VS']) ? $this->spd_keys['X-VS'] : '';
+			if ($vs !== '' && $msg !== '') {
 				$unstructured = 'VS:' . $vs . ' ' . $msg;
-			} elseif (!empty($vs)) {
+			} elseif ($vs !== '') {
 				$unstructured = 'VS:' . $vs;
 			} else {
 				$unstructured = $msg;
@@ -2053,7 +2085,8 @@ class QRInvoice implements \Stringable
 			default => throw new QRInvoiceException('Unknown file format'),
 		};
 
-		$writer->write($qrCode, $this->logo)->saveToFile($filename);
+		$path = $filename ?? ('qrcode.' . $formatStr);
+		$writer->write($qrCode, $this->logo)->saveToFile($path);
 
 		return $this;
 	}
@@ -2082,11 +2115,11 @@ class QRInvoice implements \Stringable
 	 */
 	public static function validateAccount(string $accountNumber, string $country = 'CZ'): bool
 	{
-		if (!preg_match('/^(?:([0-9]{1,6})-)?([0-9]{2,10})\/([0-9]{4})$/', trim($accountNumber), $matches)) {
+		if (preg_match('/^(?:([0-9]{1,6})-)?([0-9]{2,10})\/([0-9]{4})$/', trim($accountNumber), $matches) !== 1) {
 			return false;
 		}
 
-		$prefix = $matches[1] ?? '';
+		$prefix = $matches[1];
 		$account = $matches[2];
 		$weights = [1, 2, 4, 8, 5, 10, 9, 7, 3, 6];
 
@@ -2145,21 +2178,19 @@ class QRInvoice implements \Stringable
 	public static function accountToIban(string $accountNumber, string $country = 'CZ'): string
 	{
 		$country = strtoupper(trim($country));
-		$accountNumber = explode('/', $accountNumber);
-		$bank = $accountNumber[1] ?? '';
-		$pre = 0;
-		$acc = 0;
-		if (!str_contains($accountNumber[0], '-')) {
-			$acc = $accountNumber[0];
-		} else {
-			[$pre, $acc] = explode('-', $accountNumber[0]);
+		$accountParts = explode('/', $accountNumber);
+		$bank = $accountParts[1] ?? '';
+		$pre = '0';
+		$acc = $accountParts[0];
+		if (str_contains($accountParts[0], '-')) {
+			[$pre, $acc] = explode('-', $accountParts[0]);
 		}
 
 		$accountPart = sprintf('%06d%010s', (int) $pre, $acc);
 		$iban = $country . '00' . $bank . $accountPart;
 
 		$alfa = range('A', 'Z');
-		$alfa_replace = range(10, 35);
+		$alfa_replace = array_map(strval(...), range(10, 35));
 		$controlegetal = str_replace(
 			$alfa,
 			$alfa_replace,

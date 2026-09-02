@@ -38,5 +38,9 @@ jobs:
       - name: Rector analysis
         run: vendor/bin/rector process --dry-run
 
+      - name: PHPStan analysis
+        run: composer run phpstan
+
       - name: Run test suite
         run: composer run test
+
