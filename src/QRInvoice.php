@@ -236,7 +236,7 @@ class QRInvoice
 	public function __construct(?string $account = null, int | float | null $amount = null, ?string $variable = null, Currency | string | null $currency = null)
 	{
 		if ($account) {
-			$this->setAccount($account);
+			str_contains($account, '/') ? $this->setAccount($account) : $this->setIban($account);
 		}
 		if ($amount) {
 			$this->setAmount($amount);
@@ -258,6 +258,175 @@ class QRInvoice
 	public static function create(?string $account = null, int | float | null $amount = null, ?string $variable = null, Currency | string | null $currency = null): QRInvoice
 	{
 		return new self($account, $amount, $variable, $currency);
+	}
+
+	/**
+	 * Tovární metoda pro rychlé vytvoření okamžité platby (Instant Payment - PT:IP).
+	 *
+	 * @param string|null $account Číslo bankovního účtu nebo IBAN
+	 * @param int|float|null $amount Částka platby
+	 * @param string|null $variable Variabilní symbol platby
+	 * @param Currency|string|null $currency Měna platby (výchozí: CZK)
+	 * @param string|null $message Zpráva pro příjemce
+	 * @throws QRInvoiceException
+	 */
+	public static function createInstant(
+		?string $account = null,
+		int | float | null $amount = null,
+		?string $variable = null,
+		Currency | string | null $currency = null,
+		?string $message = null,
+	): QRInvoice {
+		$qr = new self($account, $amount, $variable, $currency);
+		$qr->setInstantPayment(true);
+
+		if ($message !== null) {
+			$qr->setMessage($message);
+		}
+
+		return $qr;
+	}
+
+	/**
+	 * Tovární metoda pro rychlé vytvoření platby dle standardu SEPA EPC QR Code (Eurozóna).
+	 *
+	 * @param string $account IBAN nebo číslo účtu příjemce
+	 * @param string $recipientName Jméno příjemce (povinné dle standardu SEPA EPC)
+	 * @param int|float|null $amount Částka v EUR
+	 * @param string|null $message Zpráva pro příjemce
+	 * @param string|null $bic BIC / SWIFT kód banky příjemce
+	 * @param string|null $variableSymbol Variabilní symbol
+	 * @throws QRInvoiceException
+	 */
+	public static function createEpc(
+		string $account,
+		string $recipientName,
+		int | float | null $amount = null,
+		?string $message = null,
+		?string $bic = null,
+		?string $variableSymbol = null,
+	): QRInvoice {
+		$qr = new self();
+		$qr->setStandard(Standard::Epc)
+			->setRecipientName($recipientName);
+
+		if (str_contains($account, '/')) {
+			$qr->setAccount($account, str_starts_with($account, 'SK') ? 'SK' : 'CZ');
+		} else {
+			$qr->setIban($account);
+		}
+
+		if ($amount !== null) {
+			$qr->setAmount($amount);
+		}
+
+		if ($message !== null) {
+			$qr->setMessage($message);
+		}
+
+		if ($bic !== null) {
+			$qr->setBic($bic);
+		}
+
+		if ($variableSymbol !== null) {
+			$qr->setVariableSymbol($variableSymbol);
+		}
+
+		return $qr;
+	}
+
+	/**
+	 * Tovární metoda pro rychlé vytvoření platby se slovenským číslem účtu.
+	 *
+	 * @param string $account Slovenské číslo účtu ve formátu [předčíslí-]číslo/kód_banky
+	 * @param int|float|null $amount Částka platby
+	 * @param string|null $variable Variabilní symbol platby
+	 * @param Currency|string|null $currency Měna platby (výchozí: EUR)
+	 * @param string|null $message Zpráva pro příjemce
+	 * @throws QRInvoiceException
+	 */
+	public static function createSlovak(
+		string $account,
+		int | float | null $amount = null,
+		?string $variable = null,
+		Currency | string | null $currency = Currency::EUR,
+		?string $message = null,
+	): QRInvoice {
+		$qr = new self();
+		$qr->setSlovakAccount($account);
+
+		if ($amount !== null) {
+			$qr->setAmount($amount);
+		}
+
+		if ($variable !== null) {
+			$qr->setVariableSymbol($variable);
+		}
+
+		if ($currency !== null) {
+			$qr->setCurrency($currency);
+		}
+
+		if ($message !== null) {
+			$qr->setMessage($message);
+		}
+
+		return $qr;
+	}
+
+	/**
+	 * Tovární metoda pro rychlé vytvoření QR Faktury (daňového dokladu).
+	 *
+	 * @param string $account Číslo bankovního účtu nebo IBAN
+	 * @param int|float $amount Celková částka k úhradě
+	 * @param string $invoiceId Číslo faktury / evidenční číslo dokladu
+	 * @param DateTime|null $dueDate Datum splatnosti
+	 * @param DateTime|null $invoiceDate Datum vystavení dokladu
+	 * @param DateTime|null $taxDate Datum uskutečnění zdanitelného plnění (DUZP)
+	 * @param string|null $variable Variabilní symbol (pokud není zadán, použije se číselná část invoiceId)
+	 * @param InvoiceDocumentType|string|null $documentType Typ dokladu (výchozí: TaxInvoice)
+	 * @param TaxPerformance|int|null $taxPerformance Plnění DPH (výchozí: Standard)
+	 * @param Currency|string|null $currency Měna (výchozí: CZK)
+	 * @throws QRInvoiceException
+	 */
+	public static function createTaxInvoice(
+		string $account,
+		int | float $amount,
+		string $invoiceId,
+		?DateTime $dueDate = null,
+		?DateTime $invoiceDate = null,
+		?DateTime $taxDate = null,
+		?string $variable = null,
+		InvoiceDocumentType | string | null $documentType = InvoiceDocumentType::TaxInvoice,
+		TaxPerformance | int | null $taxPerformance = TaxPerformance::Standard,
+		Currency | string | null $currency = null,
+	): QRInvoice {
+		$vs = $variable;
+		if ($vs === null && preg_match('/[0-9]{1,10}/', $invoiceId, $m)) {
+			$vs = $m[0];
+		}
+
+		$invoiceDate ??= new DateTime();
+		$dueDate ??= new DateTime('+14 days');
+
+		$qr = new self($account, $amount, $vs, $currency);
+		$qr->setInvoiceId($invoiceId)
+			->setInvoiceDate($invoiceDate)
+			->setDueDate($dueDate);
+
+		if ($taxDate !== null) {
+			$qr->setTaxDate($taxDate);
+		}
+
+		if ($documentType !== null) {
+			$qr->setInvoiceDocumentType($documentType);
+		}
+
+		if ($taxPerformance !== null) {
+			$qr->setTaxPerformance($taxPerformance);
+		}
+
+		return $qr;
 	}
 
 	/**

@@ -790,4 +790,55 @@ class QRPlatbaTest extends TestCase
 		$this->assertStringContainsString('<image', $svg);
 		$this->assertStringContainsString('data:image/png;base64,', $svg);
 	}
+
+	public function testCreateInstant(): void
+	{
+		$qr = QRInvoice::createInstant('27-16060243/0300', 750.00, '2026101', Currency::CZK, 'Okamzita platba');
+		$str = (string) $qr;
+
+		$this->assertStringContainsString('PT:IP', $str);
+		$this->assertStringContainsString('AM:750.00', $str);
+		$this->assertStringContainsString('X-VS:2026101', $str);
+		$this->assertStringContainsString('MSG:Okamzita platba', $str);
+	}
+
+	public function testCreateEpc(): void
+	{
+		$qr = QRInvoice::createEpc(
+			'SK6702000000001234567890',
+			'Firma s.r.o.',
+			120.50,
+			'Faktura VF2026',
+			'SUBAASKBX',
+			'2026001',
+		);
+
+		$this->assertSame(Standard::Epc, $qr->getStandard());
+		$this->assertStringContainsString('SCT', (string) $qr);
+		$this->assertStringContainsString('Firma s.r.o.', (string) $qr);
+		$this->assertStringContainsString('EUR120.50', (string) $qr);
+		$this->assertStringContainsString('SUBAASKBX', (string) $qr);
+	}
+
+	public function testCreateSlovak(): void
+	{
+		$qr = QRInvoice::createSlovak('1234567890/0200', 45.00, '2026002', Currency::EUR, 'Slovenska platba');
+		$str = (string) $qr;
+
+		$this->assertStringContainsString('ACC:SK6702000000001234567890', $str);
+		$this->assertStringContainsString('AM:45.00', $str);
+		$this->assertStringContainsString('CC:EUR', $str);
+		$this->assertStringContainsString('MSG:Slovenska platba', $str);
+	}
+
+	public function testCreateTaxInvoice(): void
+	{
+		$due = new DateTime('2026-12-31');
+		$qr = QRInvoice::createTaxInvoice('27-16060243/0300', 1210.00, 'VF-20260055', $due);
+		$str = (string) $qr;
+
+		$this->assertStringContainsString('AM:1210.00', $str);
+		$this->assertStringContainsString('X-VS:20260055', $str); // Automaticky extrahováno z čísla faktury
+		$this->assertStringContainsString('X-INV:', $str);
+	}
 }

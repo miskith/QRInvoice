@@ -75,12 +75,25 @@ echo $qrInvoice->getQRCodeImage(); // Zobrazí <img> tag s QR kódem
 
 ![Ukázka](readme/qrpayment.png)
 
-Lze použít i zkrácený zápis pomocí statického konstruktoru:
+### Rychlé statické konstruktory (tovární metody)
+
+Pro nejčastější scénáře nabízí knihovna specializované pojmenované konstruktory pro vytvoření platby na jeden řádek:
 
 ```php
-echo QRInvoice::create('27-16060243/0300', 987.60, '2016001234')
-    ->setMessage('QR platba je parádní!')
-    ->getQRCodeImage();
+// Standardní QR Platba:
+$qr = QRInvoice::create('27-16060243/0300', 987.60, '2016001234');
+
+// Okamžitá platba (Instant Payment - PT:IP):
+$qrInstant = QRInvoice::createInstant('27-16060243/0300', 500.00, '2026101', message: 'Okamžitá úhrada');
+
+// Slovenská platba v EUR (SK účet):
+$qrSlovak = QRInvoice::createSlovak('1234567890/0200', 45.00, '2026002', message: 'Platba na Slovensko');
+
+// Mezinárodní platba Eurozóny (SEPA EPC QR Code):
+$qrEpc = QRInvoice::createEpc('SK6702000000001234567890', 'Firma s.r.o.', 120.00, 'Faktura 2026', bic: 'SUBAASKBX');
+
+// QR Faktura (daňový doklad) s automatickými výchozími termíny a VS:
+$qrInvoice = QRInvoice::createTaxInvoice('27-16060243/0300', 1210.00, 'VF-20260055');
 ```
 
 ---
