@@ -10,7 +10,7 @@ return (new PhpCsFixer\Config)
 	->setParallelConfig(PhpCsFixer\Runner\Parallel\ParallelConfigFactory::detect())
 	->setRules([
 		'@PSR12' => true,
-		'@PHP83Migration' => true,
+		'@PHP84Migration' => true,
 		'array_syntax' => ['syntax' => 'short'],
 		'no_unused_imports' => true,
 		'short_scalar_cast' => true,

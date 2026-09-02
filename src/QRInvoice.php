@@ -14,11 +14,13 @@ namespace miskith\QRInvoice;
 use Endroid\QrCode\ErrorCorrectionLevel as QrErrorCorrectionLevel;
 use Endroid\QrCode\RoundBlockSizeMode as QrRoundBlockSizeMode;
 use Endroid\QrCode\Writer\BinaryWriter as QrBinaryWriter;
+use Endroid\QrCode\Writer\WebPWriter as QrWebPWriter;
 use Endroid\QrCode\Encoding\Encoding as QrEncoding;
 use Endroid\QrCode\Writer\PngWriter as QrPngWriter;
 use Endroid\QrCode\Writer\EpsWriter as QrEpsWriter;
 use Endroid\QrCode\Writer\PdfWriter as QrPdfWriter;
 use Endroid\QrCode\Writer\SvgWriter as QrSvgWriter;
+use Endroid\QrCode\Writer\GifWriter as QrGifWriter;
 use Endroid\QrCode\Color\Color as QrColor;
 use Endroid\QrCode\QrCode;
 use DateTime;
@@ -33,17 +35,17 @@ class QRInvoice
 	/**
 	 * Verze QR formátu QR Platby.
 	 */
-	public const SPD_VERSION = '1.0';
+	public const string SPD_VERSION = '1.0';
 
 	/**
 	 * Verze QR formátu QR Faktury.
 	 */
-	public const SID_VERSION = '1.0';
+	public const string SID_VERSION = '1.0';
 
 	/**
-	 * @var array
+	 * @var array<string>
 	 */
-	private static $currencies = [
+	private static array $currencies = [
 		'AED', 'AFN', 'ALL', 'AMD', 'ANG', 'AOA', 'ARS', 'AUD', 'AWG', 'AZN',
 		'BAM', 'BBD', 'BDT', 'BGN', 'BHD', 'BIF', 'BMD', 'BND', 'BOB', 'BRL',
 		'BSD', 'BTN', 'BWP', 'BYN', 'BZD', 'CAD', 'CDF', 'CHF', 'CLP', 'CNY',
@@ -200,16 +202,11 @@ class QRInvoice
 	/**
 	 * Statický konstruktor nové platby.
 	 *
-	 * @param null $account
-	 * @param null $amount
-	 * @param null $variable
-	 *
-	 * @return QRInvoice
 	 * @throws \InvalidArgumentException
 	 */
-	public static function create(?string $account = null, int | float | null $amount = null, ?string $variable = null): QRInvoice
+	public static function create(?string $account = null, int | float | null $amount = null, ?string $variable = null, ?string $currency = null): QRInvoice
 	{
-		return new self($account, $amount, $variable);
+		return new self($account, $amount, $variable, $currency);
 	}
 
 	/**
@@ -300,7 +297,7 @@ class QRInvoice
 	/**
 	 * Nastavení data úhrady.
 	 */
-	public function setDueDate(DateTime $date): QrInvoice
+	public function setDueDate(DateTime $date): QRInvoice
 	{
 		$this->spd_keys['DT'] = $this->sid_keys['DT'] = $date->format('Ymd');
 
@@ -350,7 +347,7 @@ class QRInvoice
 	/**
 	 * Nastavení data vydání faktury
 	 */
-	public function setInvoiceDate(DateTime $date): QrInvoice
+	public function setInvoiceDate(DateTime $date): QRInvoice
 	{
 		$this->sid_keys['DD'] = $date->format('Ymd');
 
@@ -478,7 +475,7 @@ class QRInvoice
 	/**
 	 * Nastavení data uskutečnění zdanitelného plnění
 	 */
-	public function setTaxDate(DateTime $date): QrInvoice
+	public function setTaxDate(DateTime $date): QRInvoice
 	{
 		$this->sid_keys['DUZP'] = $date->format('Ymd');
 
@@ -626,31 +623,22 @@ class QRInvoice
 	 * Uložení QR kódu do souboru.
 	 *
 	 * @throws \Endroid\QrCode\Exception\UnsupportedExtensionException
+	 * @throws QRInvoiceException
 	 */
 	public function saveQRCodeImage(?string $filename = null, string $format = 'png', int $size = 300, int $margin = 10): QRInvoice
 	{
 		$qrCode = $this->getQRCodeInstance($size, $margin);
 
-		switch ($format) {
-			case 'png':
-				$writer = new QrPngWriter();
-				break;
-			case 'svg':
-				$writer = new QrSvgWriter();
-				break;
-			case 'pdf':
-				$writer = new QrPdfWriter();
-				break;
-			case 'eps':
-				$writer = new QrEpsWriter();
-				break;
-			case 'bin':
-				$writer = new QrBinaryWriter();
-				break;
-			default:
-				throw new QRInvoiceException('Unknown file format');
-				break;
-		}
+		$writer = match ($format) {
+			'png' => new QrPngWriter(),
+			'svg' => new QrSvgWriter(),
+			'pdf' => new QrPdfWriter(),
+			'eps' => new QrEpsWriter(),
+			'bin' => new QrBinaryWriter(),
+			'webp' => new QrWebPWriter(),
+			'gif' => new QrGifWriter(),
+			default => throw new QRInvoiceException('Unknown file format'),
+		};
 
 		$writer->write($qrCode)->saveToFile($filename);
 

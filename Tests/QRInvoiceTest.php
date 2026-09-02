@@ -17,7 +17,7 @@ use miskith\QRInvoice\QRInvoice;
  */
 class QRInvoiceTest extends TestCase
 {
-	public function testSimpleInvoice()
+	public function testSimpleInvoice(): void
 	{
 		$string = QRInvoice::create('12-3456789012/0100', '1234.56', '2016001234')
 			->setMessage('Düakrítičs')
@@ -30,7 +30,7 @@ class QRInvoiceTest extends TestCase
 		);
 	}
 
-	public function testSimpleOnlyInvoice()
+	public function testSimpleOnlyInvoice(): void
 	{
 		$string = QRInvoice::create('12-3456789012/0100', '1234.56', '2016001234')
 			->setIsOnlyInvoice(true)
@@ -44,7 +44,7 @@ class QRInvoiceTest extends TestCase
 		);
 	}
 
-	public function testFirstFromDocumentation()
+	public function testFirstFromDocumentation(): void
 	{
 		$string = QRInvoice::create('27-16060243/0300', 495.00, '012150672')
 			->setInvoiceId('012150672')
@@ -64,7 +64,7 @@ class QRInvoiceTest extends TestCase
 		);
 	}
 
-	public function testFirstFromDocumentationOnlyInvoice()
+	public function testFirstFromDocumentationOnlyInvoice(): void
 	{
 		$string = QRInvoice::create('27-16060243/0300', 495.00, '012150672')
 			->setIsOnlyInvoice(true)
@@ -85,9 +85,9 @@ class QRInvoiceTest extends TestCase
 		);
 	}
 
-	public function testSecondFromDocumentation()
+	public function testSecondFromDocumentation(): void
 	{
-		$string = (new QRInvoice())
+		$string = new QRInvoice()
 			->setIban('CZ9701000000007098760287+KOMBCZPP')
 			->setAmount(61189.00)
 			->setVariableSymbol('3310001054')
@@ -116,9 +116,9 @@ class QRInvoiceTest extends TestCase
 		);
 	}
 
-	public function testSecondFromDocumentationOnlyInvoice()
+	public function testSecondFromDocumentationOnlyInvoice(): void
 	{
-		$string = (new QRInvoice())
+		$string = new QRInvoice()
 			->setIban('CZ9701000000007098760287+KOMBCZPP')
 			->setAmount(61189.00)
 			->setVariableSymbol('3310001054')

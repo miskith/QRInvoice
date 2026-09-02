@@ -17,7 +17,7 @@ use miskith\QRInvoice\QRInvoice;
  */
 class IBANTest extends TestCase
 {
-	public function testAccountHigherThanMaxInt()
+	public function testAccountHigherThanMaxInt(): void
 	{
 		$string = QRInvoice::accountToIban('2501301193/2010');
 
