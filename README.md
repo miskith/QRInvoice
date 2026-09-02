@@ -24,6 +24,7 @@ QR platba zjednodušuje koncovému uživateli provedení příkazu k úhradě v 
 - Uložení do souboru v široké škále formátů: **PNG, SVG, PDF, EPS, WebP, GIF, binární** (`$qrInvoice->saveQRCodeImage()`).
 - Získání instance objektu [Endroid\QrCode\QrCode](https://github.com/endroid/qr-code) pro pokročilé úpravy (`$qrInvoice->getQRCodeInstance()`).
 - Vložení loga do středu QR kódu: oficiální logo ČBA „QR Platba“ (`withDefaultLogo`) i libovolné vlastní firemní logo (`setLogo`).
+- Přizpůsobení barev na míru firemnímu brandingu: barva popředí (`setForegroundColor`), pozadí (`setBackgroundColor`), hromadně (`setColors`) i průhledné pozadí (`setTransparentBackground`).
 - Podpora pro české i slovenské bankovní účty (automatický převod na IBAN: `setAccount`, `setSlovakAccount`) i přímé zadání IBAN/BIC.
 - Podpora pro standard **SEPA EPC QR Code** (EPC069-12) pro platby v rámci celé **Eurozóny** (`Standard::Epc`).
 - Podpora pro měnu CZK i ostatní světové měny dle ISO 4217 pomocí `setCurrency(Currency::CZK)`.
@@ -217,6 +218,36 @@ echo $qr->getQRCodeImage();
 ```
 
 <img src="readme/qr_custom_logo.png" width="220" alt="QR Platba s vlastním logem" />
+
+---
+
+## Přizpůsobení barev (firemní branding)
+
+Knihovna umožňuje libovolně přizpůsobit barvu modulů (popředí) i barvu pozadí tak, aby QR kód ladil s vizuální identitou vaší značky nebo designem faktury:
+
+Barvy lze zadávat několika způsoby:
+- **HEX kód** (např. `'#0F172A'`, `'#4F46E5'`, `'#FFF'`)
+- **RGB složky** (např. `$qr->setForegroundColor(15, 23, 42)`)
+- **Objekt `Endroid\QrCode\Color\Color`**
+- **Průhledné pozadí** pomocí `setTransparentBackground(true)`
+
+```php
+$qr = new QRInvoice()
+    ->setAccount('27-16060243/0300')
+    ->setAmount(1890.00)
+    ->setVariableSymbol('2026099')
+    ->setMessage('Objednavka #2026099')
+    ->setForegroundColor('#0F172A') // Tmavé slate popředí
+    ->setBackgroundColor('#F8FAFC') // Jemně šedé pozadí
+    ->setLogo(__DIR__ . '/cesta/k/logo.png', 55, 55);
+
+echo $qr->getQRCodeImage();
+```
+
+<img src="readme/qr_branded.png" width="220" alt="QR Platba s vlastním brandingem a barvami" />
+
+> [!TIP]
+> **Doporučení pro kontrast:** Pro zachování spolehlivé čitelnosti všemi mobilními fotoaparáty a bankovními aplikacemi vždy dbejte na dostatečný kontrast mezi popředím a pozadím (ideálně tmavé popředí na světlém podkladu).
 
 ---
 

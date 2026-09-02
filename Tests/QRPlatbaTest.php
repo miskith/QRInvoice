@@ -669,4 +669,85 @@ class QRPlatbaTest extends TestCase
 
 		$qr->setLogo('non_existent_file_path.png');
 	}
+
+	public function testForegroundColorHexAndRgb(): void
+	{
+		$qr = new QRInvoice();
+		$qr->setAccount('27-16060243/0300');
+
+		// 6-digit hex with hash
+		$qr->setForegroundColor('#4F46E5');
+		$this->assertNotNull($qr->getForegroundColor());
+		$this->assertSame(79, $qr->getForegroundColor()->getRed());
+		$this->assertSame(70, $qr->getForegroundColor()->getGreen());
+		$this->assertSame(229, $qr->getForegroundColor()->getBlue());
+
+		// 3-digit hex without hash
+		$qr->setForegroundColor('F00');
+		$this->assertSame(255, $qr->getForegroundColor()->getRed());
+		$this->assertSame(0, $qr->getForegroundColor()->getGreen());
+		$this->assertSame(0, $qr->getForegroundColor()->getBlue());
+
+		// RGB integers
+		$qr->setForegroundColor(16, 185, 129);
+		$this->assertSame(16, $qr->getForegroundColor()->getRed());
+		$this->assertSame(185, $qr->getForegroundColor()->getGreen());
+		$this->assertSame(129, $qr->getForegroundColor()->getBlue());
+
+		$qrInstance = $qr->getQRCodeInstance();
+		$this->assertSame(16, $qrInstance->getForegroundColor()->getRed());
+	}
+
+	public function testBackgroundColorAndSetColors(): void
+	{
+		$qr = new QRInvoice();
+		$qr->setAccount('27-16060243/0300');
+
+		$qr->setColors('#1E293B', '#F8FAFC');
+		$this->assertSame(30, $qr->getForegroundColor()->getRed());
+		$this->assertSame(248, $qr->getBackgroundColor()->getRed());
+
+		// Test reset to null
+		$qr->setForegroundColor(null);
+		$qr->setBackgroundColor(null);
+		$this->assertNull($qr->getForegroundColor());
+		$this->assertNull($qr->getBackgroundColor());
+
+		$qrInstance = $qr->getQRCodeInstance();
+		$this->assertSame(0, $qrInstance->getForegroundColor()->getRed());
+		$this->assertSame(255, $qrInstance->getBackgroundColor()->getRed());
+	}
+
+	public function testTransparentBackground(): void
+	{
+		$qr = new QRInvoice();
+		$qr->setAccount('27-16060243/0300');
+
+		$qr->setTransparentBackground(true);
+		$this->assertNotNull($qr->getBackgroundColor());
+		$this->assertSame(127, $qr->getBackgroundColor()->getAlpha());
+
+		$img = $qr->getQRCodeImage();
+		$this->assertStringStartsWith('<img src="data:image/png;base64,', $img);
+	}
+
+	public function testInvalidHexColorThrows(): void
+	{
+		$qr = new QRInvoice();
+
+		$this->expectException(QRInvoiceException::class);
+		$this->expectExceptionMessage('Invalid HEX color format');
+
+		$qr->setForegroundColor('invalid-hex');
+	}
+
+	public function testIntegerWithoutGreenThrows(): void
+	{
+		$qr = new QRInvoice();
+
+		$this->expectException(QRInvoiceException::class);
+		$this->expectExceptionMessage('RGB components (green and blue) must be provided');
+
+		$qr->setForegroundColor(255);
+	}
 }

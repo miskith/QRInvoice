@@ -13,6 +13,7 @@ namespace miskith\QRInvoice;
 
 use DateTime;
 use Endroid\QrCode\Color\Color as QrColor;
+use Endroid\QrCode\Color\ColorInterface;
 use Endroid\QrCode\Encoding\Encoding as QrEncoding;
 use Endroid\QrCode\ErrorCorrectionLevel as QrErrorCorrectionLevel;
 use Endroid\QrCode\Logo\Logo as QrLogo;
@@ -217,6 +218,16 @@ class QRInvoice
 	private ?LogoInterface $logo = null;
 
 	/**
+	 * Barva modulů QR kódu (popředí).
+	 */
+	private ?ColorInterface $foregroundColor = null;
+
+	/**
+	 * Barva pozadí QR kódu.
+	 */
+	private ?ColorInterface $backgroundColor = null;
+
+	/**
 	 * Konstruktor nové platby.
 	 *
 	 * @throws \InvalidArgumentException
@@ -397,6 +408,149 @@ class QRInvoice
 	public function getLogo(): ?LogoInterface
 	{
 		return $this->logo;
+	}
+
+	/**
+	 * Nastavení barvy popředí (modulů) QR kódu.
+	 *
+	 * Lze předat:
+	 * - HEX řetězec: např. "#4F46E5", "#FFF", "10B981"
+	 * - RGB složky: setForegroundColor(79, 70, 229)
+	 * - Instanci ColorInterface (např. new Color(79, 70, 229))
+	 * - null pro obnovení výchozí černé barvy
+	 *
+	 * @param ColorInterface|string|int|null $colorOrRed HEX řetězec, ColorInterface, hodnota červené složky RGB nebo null
+	 * @param int|null $green Hodnota zelené složky (pokud je první parametr int)
+	 * @param int|null $blue Hodnota modré složky (pokud je první parametr int)
+	 * @param int $alpha Průhlednost 0-127 (0 = neprůhledná)
+	 * @throws QRInvoiceException
+	 */
+	public function setForegroundColor(
+		ColorInterface | string | int | null $colorOrRed,
+		?int $green = null,
+		?int $blue = null,
+		int $alpha = 0,
+	): QRInvoice {
+		$this->foregroundColor = $colorOrRed !== null
+			? $this->resolveColor($colorOrRed, $green, $blue, $alpha)
+			: null;
+
+		return $this;
+	}
+
+	/**
+	 * Získání nastavené barvy popředí.
+	 */
+	public function getForegroundColor(): ?ColorInterface
+	{
+		return $this->foregroundColor;
+	}
+
+	/**
+	 * Nastavení barvy pozadí QR kódu.
+	 *
+	 * Lze předat:
+	 * - HEX řetězec: např. "#F8FAFC", "#FFFFFF"
+	 * - RGB složky: setBackgroundColor(248, 250, 252)
+	 * - Instanci ColorInterface
+	 * - null pro obnovení výchozí bílé barvy
+	 *
+	 * @param ColorInterface|string|int|null $colorOrRed HEX řetězec, ColorInterface, hodnota červené složky RGB nebo null
+	 * @param int|null $green Hodnota zelené složky (pokud je první parametr int)
+	 * @param int|null $blue Hodnota modré složky (pokud je první parametr int)
+	 * @param int $alpha Průhlednost 0-127 (0 = neprůhledná)
+	 * @throws QRInvoiceException
+	 */
+	public function setBackgroundColor(
+		ColorInterface | string | int | null $colorOrRed,
+		?int $green = null,
+		?int $blue = null,
+		int $alpha = 0,
+	): QRInvoice {
+		$this->backgroundColor = $colorOrRed !== null
+			? $this->resolveColor($colorOrRed, $green, $blue, $alpha)
+			: null;
+
+		return $this;
+	}
+
+	/**
+	 * Získání nastavené barvy pozadí.
+	 */
+	public function getBackgroundColor(): ?ColorInterface
+	{
+		return $this->backgroundColor;
+	}
+
+	/**
+	 * Hromadné nastavení barev popředí i pozadí.
+	 *
+	 * @param ColorInterface|string|int $foregroundColor Barva modulů (HEX, RGB nebo ColorInterface)
+	 * @param ColorInterface|string|int|null $backgroundColor Barva pozadí (HEX, RGB nebo ColorInterface)
+	 * @throws QRInvoiceException
+	 */
+	public function setColors(
+		ColorInterface | string | int $foregroundColor,
+		ColorInterface | string | int | null $backgroundColor = null,
+	): QRInvoice {
+		$this->setForegroundColor($foregroundColor);
+		if ($backgroundColor !== null) {
+			$this->setBackgroundColor($backgroundColor);
+		}
+
+		return $this;
+	}
+
+	/**
+	 * Nastavení průhledného pozadí QR kódu.
+	 */
+	public function setTransparentBackground(bool $transparent = true): QRInvoice
+	{
+		$this->backgroundColor = $transparent
+			? new QrColor(255, 255, 255, 127)
+			: new QrColor(255, 255, 255, 0);
+
+		return $this;
+	}
+
+	/**
+	 * Pomocná metoda pro převod HEX řetězce, RGB složek či ColorInterface na ColorInterface.
+	 *
+	 * @throws QRInvoiceException
+	 */
+	private function resolveColor(
+		ColorInterface | string | int $colorOrRed,
+		?int $green = null,
+		?int $blue = null,
+		int $alpha = 0,
+	): ColorInterface {
+		if ($colorOrRed instanceof ColorInterface) {
+			return $colorOrRed;
+		}
+
+		if (is_int($colorOrRed)) {
+			if ($green === null || $blue === null) {
+				throw new QRInvoiceException('RGB components (green and blue) must be provided when red is an integer.');
+			}
+
+			return new QrColor($colorOrRed, $green, $blue, $alpha);
+		}
+
+		$hex = ltrim(trim($colorOrRed), '#');
+
+		if (strlen($hex) === 3) {
+			$hex = $hex[0] . $hex[0] . $hex[1] . $hex[1] . $hex[2] . $hex[2];
+		}
+
+		if (!preg_match('/^[0-9a-fA-F]{6}$/', $hex)) {
+			throw new QRInvoiceException(sprintf('Invalid HEX color format: "%s". Expected format like "#4F46E5" or "#FFF".', $colorOrRed));
+		}
+
+		$red = (int) hexdec(substr($hex, 0, 2));
+		$green = (int) hexdec(substr($hex, 2, 2));
+		$blue = (int) hexdec(substr($hex, 4, 2));
+
+		return new QrColor($red, $green, $blue, $alpha);
 	}
 
 	/**
@@ -1265,8 +1419,8 @@ class QRInvoice
 			errorCorrectionLevel: $errorCorrection,
 			margin: $margin,
 			roundBlockSizeMode: QrRoundBlockSizeMode::Enlarge,
-			foregroundColor: new QrColor(0, 0, 0, 0),
-			backgroundColor: new QrColor(255, 255, 255, 0),
+			foregroundColor: $this->foregroundColor ?? new QrColor(0, 0, 0, 0),
+			backgroundColor: $this->backgroundColor ?? new QrColor(255, 255, 255, 0),
 		);
 	}
 
