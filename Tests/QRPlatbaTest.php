@@ -13,6 +13,7 @@ use Endroid\QrCode\QrCode;
 use miskith\QRInvoice\Enum\Currency;
 use miskith\QRInvoice\Enum\Format;
 use miskith\QRInvoice\Enum\PaymentType;
+use miskith\QRInvoice\Enum\Standard;
 use miskith\QRInvoice\QRInvoice;
 use miskith\QRInvoice\QRInvoiceException;
 use PHPUnit\Framework\TestCase;
@@ -494,5 +495,138 @@ class QRPlatbaTest extends TestCase
 		$this->expectExceptionMessage('Alternative account number "12-3456789012/0100" is not a valid Czech bank account');
 
 		$qr->addAlternativeAccount('12-3456789012/0100');
+	}
+
+	public function testSlovakAccountToIban(): void
+	{
+		$iban = QRInvoice::accountToIban('1234567890/0200', 'SK');
+		$this->assertSame('SK6702000000001234567890', $iban);
+
+		// ISO 7064 Mod 97 ověření
+		$checkStr = substr($iban, 4) . '2820' . substr($iban, 2, 2);
+		$this->assertSame('1', bcmod($checkStr, '97'));
+	}
+
+	public function testSetSlovakAccount(): void
+	{
+		$qr = new QRInvoice();
+		$qr->setSlovakAccount('1234567890/0200');
+
+		$this->assertStringContainsString('ACC:SK6702000000001234567890', $qr->__toString());
+	}
+
+	public function testSlovakAccountValidationWhenEnabled(): void
+	{
+		$this->assertTrue(QRInvoice::validateSlovakAccount('222885/0200'));
+		$this->assertFalse(QRInvoice::validateSlovakAccount('12-3456789012/0900'));
+
+		$qr = new QRInvoice();
+		$qr->setValidateAccount(true);
+
+		$this->expectException(QRInvoiceException::class);
+		$this->expectExceptionMessage('is not a valid Slovak bank account (modulo 11 check failed)');
+
+		$qr->setSlovakAccount('12-3456789012/0900');
+	}
+
+	public function testEpcStandardGeneration(): void
+	{
+		$qr = new QRInvoice();
+		$qr->setStandard(Standard::Epc)
+			->setRecipientName('Firma s.r.o.')
+			->setIban('SK6702000000001234567890')
+			->setBic('SUBAASKBX')
+			->setAmount(150.00)
+			->setCurrency(Currency::EUR)
+			->setVariableSymbol('2026001')
+			->setMessage('Platba objednavky');
+
+		$this->assertSame(Standard::Epc, $qr->getStandard());
+		$this->assertSame('SUBAASKBX', $qr->getBic());
+
+		$expected = implode("\n", [
+			'BCD',
+			'002',
+			'1',
+			'SCT',
+			'SUBAASKBX',
+			'Firma s.r.o.',
+			'SK6702000000001234567890',
+			'EUR150.00',
+			'',
+			'',
+			'VS:2026001 Platba objednavky',
+		]);
+
+		$this->assertSame($expected, (string) $qr);
+		$this->assertSame($expected, $qr->getEpcString());
+	}
+
+	public function testEpcStructuredReference(): void
+	{
+		$qr = new QRInvoice();
+		$qr->setStandard(Standard::Epc)
+			->setRecipientName('ACME Europe')
+			->setIban('SK6702000000001234567890')
+			->setAmount(99.00)
+			->setCurrency(Currency::EUR)
+			->setRemittanceReference('RF18539007547034')
+			->setPurpose('GDDS');
+
+		$this->assertSame('RF18539007547034', $qr->getRemittanceReference());
+		$this->assertSame('GDDS', $qr->getPurpose());
+
+		$expected = implode("\n", [
+			'BCD',
+			'002',
+			'1',
+			'SCT',
+			'',
+			'ACME Europe',
+			'SK6702000000001234567890',
+			'EUR99.00',
+			'GDDS',
+			'RF18539007547034',
+		]);
+
+		$this->assertSame($expected, (string) $qr);
+	}
+
+	public function testEpcRequiresRecipientName(): void
+	{
+		$qr = new QRInvoice();
+		$qr->setStandard(Standard::Epc)
+			->setIban('SK6702000000001234567890');
+
+		$this->expectException(QRInvoiceException::class);
+		$this->expectExceptionMessage('Recipient name (setRecipientName) is required for SEPA EPC QR code.');
+
+		$qr->getEpcString();
+	}
+
+	public function testEpcRequiresEurCurrency(): void
+	{
+		$qr = new QRInvoice();
+		$qr->setStandard(Standard::Epc)
+			->setRecipientName('ACME Europe')
+			->setIban('SK6702000000001234567890')
+			->setCurrency(Currency::CZK);
+
+		$this->expectException(QRInvoiceException::class);
+		$this->expectExceptionMessage('SEPA EPC QR code requires EUR currency.');
+
+		$qr->getEpcString();
+	}
+
+	public function testEpcQRCodeImageGeneration(): void
+	{
+		$qr = new QRInvoice();
+		$qr->setStandard(Standard::Epc)
+			->setRecipientName('Jan Novak')
+			->setIban('SK6702000000001234567890')
+			->setAmount(25.50);
+
+		$img = $qr->getQRCodeImage();
+		$this->assertStringStartsWith('<img src="data:image/png;base64,', $img);
 	}
 }

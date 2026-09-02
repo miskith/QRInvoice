@@ -28,6 +28,7 @@ use miskith\QRInvoice\Enum\Currency;
 use miskith\QRInvoice\Enum\Format;
 use miskith\QRInvoice\Enum\InvoiceDocumentType;
 use miskith\QRInvoice\Enum\PaymentType;
+use miskith\QRInvoice\Enum\Standard;
 use miskith\QRInvoice\Enum\TaxPerformance;
 
 /**
@@ -184,9 +185,29 @@ class QRInvoice
 	private bool $isOnlyInvoice = false;
 
 	/**
-	 * Přepínač validace čísla účtu pro tuto instanci (Modulo 11 ČNB).
+	 * Přepínač validace čísla účtu pro tuto instanci (Modulo 11).
 	 */
 	private bool $validateAccount = false;
+
+	/**
+	 * Platební standard (SPAYD pro ČR, EPC pro SEPA / Eurozónu).
+	 */
+	private Standard $standard = Standard::Spayd;
+
+	/**
+	 * BIC / SWIFT kód banky (pro mezinárodní / SEPA EPC platby).
+	 */
+	private ?string $bic = null;
+
+	/**
+	 * Kód účelu platby (SEPA EPC Purpose Code, max 4 znaky).
+	 */
+	private ?string $purpose = null;
+
+	/**
+	 * Strukturovaná reference platby (např. ISO 11649 RF Creditor Reference).
+	 */
+	private ?string $remittanceReference = null;
 
 	/**
 	 * Konstruktor nové platby.
@@ -222,7 +243,95 @@ class QRInvoice
 	}
 
 	/**
-	 * Povolení či zakázání validace českého čísla účtu (Modulo 11 ČNB).
+	 * Nastavení platebního standardu (SPAYD pro ČR nebo EPC pro SEPA / Eurozónu).
+	 */
+	public function setStandard(Standard | string $standard): QRInvoice
+	{
+		$this->standard = $standard instanceof Standard ? $standard : Standard::from(strtoupper($standard));
+
+		if ($this->standard === Standard::Epc && ($this->spd_keys['CC'] === 'CZK' || empty($this->spd_keys['CC']))) {
+			$this->spd_keys['CC'] = 'EUR';
+		}
+
+		return $this;
+	}
+
+	/**
+	 * Získání aktuálně nastaveného platebního standardu.
+	 */
+	public function getStandard(): Standard
+	{
+		return $this->standard;
+	}
+
+	/**
+	 * Nastavení BIC / SWIFT kódu banky příjemce.
+	 */
+	public function setBic(?string $bic): QRInvoice
+	{
+		$this->bic = $bic !== null ? strtoupper(trim($bic)) : null;
+
+		return $this;
+	}
+
+	/**
+	 * Získání BIC / SWIFT kódu banky příjemce.
+	 */
+	public function getBic(): ?string
+	{
+		return $this->bic;
+	}
+
+	/**
+	 * Nastavení 4znakového SEPA kódu účelu platby (Purpose Code, např. GDDS, CHAR).
+	 *
+	 * @throws QRInvoiceException
+	 */
+	public function setPurpose(?string $purpose): QRInvoice
+	{
+		if ($purpose !== null && mb_strlen($purpose) > 4) {
+			throw new QRInvoiceException('SEPA purpose code cannot exceed 4 characters.');
+		}
+
+		$this->purpose = $purpose !== null ? strtoupper(trim($purpose)) : null;
+
+		return $this;
+	}
+
+	/**
+	 * Získání SEPA kódu účelu platby.
+	 */
+	public function getPurpose(): ?string
+	{
+		return $this->purpose;
+	}
+
+	/**
+	 * Nastavení strukturované reference platby dle ISO 11649 (např. RF18539007547034).
+	 *
+	 * @throws QRInvoiceException
+	 */
+	public function setRemittanceReference(?string $reference): QRInvoice
+	{
+		if ($reference !== null && mb_strlen($reference) > 35) {
+			throw new QRInvoiceException('SEPA remittance reference cannot exceed 35 characters.');
+		}
+
+		$this->remittanceReference = $reference !== null ? trim($reference) : null;
+
+		return $this;
+	}
+
+	/**
+	 * Získání strukturované reference platby.
+	 */
+	public function getRemittanceReference(): ?string
+	{
+		return $this->remittanceReference;
+	}
+
+	/**
+	 * Povolení či zakázání validace čísla účtu (Modulo 11).
 	 */
 	public function setValidateAccount(bool $validate = true): QRInvoice
 	{
@@ -240,17 +349,31 @@ class QRInvoice
 	}
 
 	/**
-	 * Nastavení čísla účtu ve formátu 12-3456789012/0100.
+	 * Nastavení slovenského čísla účtu ve formátu [předčíslí-]číslo/kód_banky.
 	 *
 	 * @throws QRInvoiceException
 	 */
-	public function setAccount(string $account): QRInvoice
+	public function setSlovakAccount(string $account): QRInvoice
 	{
-		if ($this->validateAccount && !self::validateCzechAccount($account)) {
-			throw new QRInvoiceException(sprintf('Account number "%s" is not a valid Czech bank account (modulo 11 check failed).', $account));
+		return $this->setAccount($account, 'SK');
+	}
+
+	/**
+	 * Nastavení čísla účtu ve formátu [předčíslí-]číslo/kód_banky.
+	 *
+	 * @param string $account Číslo účtu
+	 * @param string $country Kód země (CZ nebo SK, výchozí: CZ)
+	 * @throws QRInvoiceException
+	 */
+	public function setAccount(string $account, string $country = 'CZ'): QRInvoice
+	{
+		$country = strtoupper(trim($country));
+		$countryName = $country === 'SK' ? 'Slovak' : 'Czech';
+		if ($this->validateAccount && !self::validateAccount($account, $country)) {
+			throw new QRInvoiceException(sprintf('Account number "%s" is not a valid %s bank account (modulo 11 check failed).', $account, $countryName));
 		}
 
-		$this->spd_keys['ACC'] = $this->sid_keys['ACC'] = self::accountToIban($account);
+		$this->spd_keys['ACC'] = $this->sid_keys['ACC'] = self::accountToIban($account, $country);
 
 		return $this;
 	}
@@ -877,10 +1000,88 @@ class QRInvoice
 	}
 
 	/**
+	 * Generování řetězce dle standardu SEPA EPC QR Code (EPC069-12 pro Eurozónu).
+	 *
+	 * @throws QRInvoiceException
+	 */
+	public function getEpcString(): string
+	{
+		$rawAccount = $this->spd_keys['ACC'] ?? '';
+		if (empty($rawAccount)) {
+			throw new QRInvoiceException('IBAN or bank account is required for SEPA EPC QR code.');
+		}
+
+		$iban = $rawAccount;
+		$bic = $this->bic ?? '';
+
+		if (str_contains($rawAccount, '+')) {
+			[$iban, $accBic] = explode('+', $rawAccount, 2);
+			if (empty($bic)) {
+				$bic = $accBic;
+			}
+		}
+
+		$recipientName = $this->spd_keys['RN'] ?? '';
+		if (empty($recipientName)) {
+			throw new QRInvoiceException('Recipient name (setRecipientName) is required for SEPA EPC QR code.');
+		}
+
+		$currency = $this->spd_keys['CC'] ?? 'EUR';
+		if ($currency !== 'EUR') {
+			throw new QRInvoiceException('SEPA EPC QR code requires EUR currency.');
+		}
+
+		$amountStr = '';
+		if ($this->spd_keys['AM'] !== null && (float) $this->spd_keys['AM'] > 0) {
+			$amountStr = sprintf('EUR%.2f', (float) $this->spd_keys['AM']);
+		}
+
+		$purpose = $this->purpose ?? '';
+		$ref = $this->remittanceReference ?? '';
+		$unstructured = '';
+
+		if (empty($ref)) {
+			$msg = $this->spd_keys['MSG'] ?? '';
+			$vs = $this->spd_keys['X-VS'] ?? '';
+			if (!empty($vs) && !empty($msg)) {
+				$unstructured = 'VS:' . $vs . ' ' . $msg;
+			} elseif (!empty($vs)) {
+				$unstructured = 'VS:' . $vs;
+			} else {
+				$unstructured = $msg;
+			}
+		}
+
+		$lines = [
+			'BCD',
+			'002',
+			'1',
+			'SCT',
+			$bic,
+			mb_substr($recipientName, 0, 70),
+			$iban,
+			$amountStr,
+			mb_substr($purpose, 0, 4),
+			mb_substr($ref, 0, 35),
+			mb_substr($unstructured, 0, 140),
+		];
+
+		while (!empty($lines) && end($lines) === '') {
+			array_pop($lines);
+		}
+
+		return implode("\n", $lines);
+	}
+
+	/**
 	 * Metoda vrátí QR Platbu nebo Fakturu s integrovanou QR Platbou jako textový řetězec.
 	 */
 	public function __toString(): string
 	{
+		if ($this->standard === Standard::Epc) {
+			return $this->getEpcString();
+		}
+
 		$encoded_string = '';
 
 		// QR Platba
@@ -999,9 +1200,9 @@ class QRInvoice
 	}
 
 	/**
-	 * Ověří, zda české číslo účtu splňuje pravidla ČNB (formát a vážené Modulo 11).
+	 * Ověří, zda číslo účtu splňuje pravidla formátu a váženého Modulo 11 pro danou zemi (CZ nebo SK).
 	 */
-	public static function validateCzechAccount(string $accountNumber): bool
+	public static function validateAccount(string $accountNumber, string $country = 'CZ'): bool
 	{
 		if (!preg_match('/^(?:([0-9]{1,6})-)?([0-9]{2,10})\/([0-9]{4})$/', trim($accountNumber), $matches)) {
 			return false;
@@ -1025,7 +1226,23 @@ class QRInvoice
 	}
 
 	/**
-	 * Výpočet váženého kontrolního součtu modulo 11 zprava doleva dle specifikace ČNB.
+	 * Ověří, zda české číslo účtu splňuje pravidla ČNB (formát a vážené Modulo 11).
+	 */
+	public static function validateCzechAccount(string $accountNumber): bool
+	{
+		return self::validateAccount($accountNumber, 'CZ');
+	}
+
+	/**
+	 * Ověří, zda slovenské číslo účtu splňuje pravidla NBS (formát a vážené Modulo 11).
+	 */
+	public static function validateSlovakAccount(string $accountNumber): bool
+	{
+		return self::validateAccount($accountNumber, 'SK');
+	}
+
+	/**
+	 * Výpočet váženého kontrolního součtu modulo 11 zprava doleva dle specifikace ČNB / NBS.
 	 *
 	 * @param array<int> $weights
 	 */
@@ -1042,38 +1259,37 @@ class QRInvoice
 	}
 
 	/**
-	 * Převedení čísla účtu na formát IBAN.
+	 * Převedení čísla účtu na formát IBAN (CZ nebo SK).
+	 *
+	 * @param string $accountNumber Číslo účtu ve formátu [předčíslí-]číslo/kód_banky
+	 * @param string $country Kód země (CZ nebo SK, výchozí CZ)
 	 */
-	public static function accountToIban(string $accountNumber): string
+	public static function accountToIban(string $accountNumber, string $country = 'CZ'): string
 	{
+		$country = strtoupper(trim($country));
 		$accountNumber = explode('/', $accountNumber);
-		$bank = $accountNumber[1];
+		$bank = $accountNumber[1] ?? '';
 		$pre = 0;
 		$acc = 0;
-		if (false === mb_strpos($accountNumber[0], '-')) {
+		if (!str_contains($accountNumber[0], '-')) {
 			$acc = $accountNumber[0];
 		} else {
 			[$pre, $acc] = explode('-', $accountNumber[0]);
 		}
 
-		$accountPart = sprintf('%06d%010s', $pre, $acc);
-		$iban = 'CZ00'.$bank.$accountPart;
+		$accountPart = sprintf('%06d%010s', (int) $pre, $acc);
+		$iban = $country . '00' . $bank . $accountPart;
 
-		$alfa = 'A B C D E F G H I J K L M N O P Q R S T U V W X Y Z';
-		$alfa = explode(' ', $alfa);
-		$alfa_replace = [];
-		for ($i = 1; $i < 27; ++$i) {
-			$alfa_replace[] = $i + 9;
-		}
+		$alfa = range('A', 'Z');
+		$alfa_replace = range(10, 35);
 		$controlegetal = str_replace(
 			$alfa,
 			$alfa_replace,
-			mb_substr($iban, 4, mb_strlen($iban) - 4).mb_substr($iban, 0, 2).'00',
+			mb_substr($iban, 4, mb_strlen($iban) - 4) . mb_substr($iban, 0, 2) . '00',
 		);
-		$controlegetal = 98 - (int) bcmod($controlegetal, 97);
-		$iban = sprintf('CZ%02d%04d%06d%010s', $controlegetal, $bank, $pre, $acc);
+		$controlegetal = 98 - (int) bcmod($controlegetal, '97');
 
-		return $iban;
+		return sprintf('%s%02d%04d%06d%010s', $country, $controlegetal, (int) $bank, (int) $pre, $acc);
 	}
 
 	/**

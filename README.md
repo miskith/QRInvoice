@@ -23,7 +23,8 @@ QR platba zjednodušuje koncovému uživateli provedení příkazu k úhradě v 
 - Získání čistého `data-uri` řetězce (`$qrInvoice->getQRCodeImage(false)`).
 - Uložení do souboru v široké škále formátů: **PNG, SVG, PDF, EPS, WebP, GIF, binární** (`$qrInvoice->saveQRCodeImage()`).
 - Získání instance objektu [Endroid\QrCode\QrCode](https://github.com/endroid/qr-code) pro pokročilé úpravy (`$qrInvoice->getQRCodeInstance()`).
-- Podpora pro české bankovní účty (automatický převod na IBAN) i přímé zadání IBAN/BIC.
+- Podpora pro české i slovenské bankovní účty (automatický převod na IBAN: `setAccount`, `setSlovakAccount`) i přímé zadání IBAN/BIC.
+- Podpora pro standard **SEPA EPC QR Code** (EPC069-12) pro platby v rámci celé **Eurozóny** (`Standard::Epc`).
 - Podpora pro měnu CZK i ostatní světové měny dle ISO 4217 pomocí `setCurrency(Currency::CZK)`.
 
 > [!TIP]
@@ -129,6 +130,53 @@ $qr->setValidateAccount(true)
 
 // Samostatné ověření čísla účtu kdekoli v aplikaci:
 $isValid = QRInvoice::validateCzechAccount('27-16060243/0300'); // true / false
+```
+
+---
+
+## Slovenské bankovní účty (SK)
+
+Knihovna plně podporuje převod slovenských čísel účtů na IBAN (`SK...`) i jejich validaci podle pravidel Národnej banky Slovenska (NBS):
+
+```php
+use miskith\QRInvoice\QRInvoice;
+
+$qr = new QRInvoice();
+
+// Automatický převod slovenského účtu na SK IBAN:
+$qr->setSlovakAccount('1234567890/0200'); // vygeneruje SK6702000000001234567890
+
+// Volitelná validace Modulo 11 pro slovenské účty:
+$qr->setValidateAccount(true)
+   ->setSlovakAccount('1234567890/0200');
+
+// Samostatné ověření slovenského účtu:
+$isValid = QRInvoice::validateSlovakAccount('1234567890/0200');
+```
+
+---
+
+## Platby v Eurozóně (SEPA EPC QR Code)
+
+Pro platby v eurech v rámci celé Evropské unie / Eurozóny (Slovensko, Německo, Rakousko atd.) knihovna podporuje oficiální evropský standard **EPC Quick Response Code** (EPC069-12 pro SEPA Credit Transfer):
+
+```php
+use miskith\QRInvoice\Enum\Currency;
+use miskith\QRInvoice\Enum\Standard;
+use miskith\QRInvoice\QRInvoice;
+
+$qr = new QRInvoice();
+$qr->setStandard(Standard::Epc)
+   ->setRecipientName('Firma s.r.o.')
+   ->setIban('SK6702000000001234567890')
+   ->setBic('SUBAASKBX')                   // Volitelný BIC / SWIFT
+   ->setAmount(150.00)
+   ->setCurrency(Currency::EUR)
+   ->setVariableSymbol('2026001')
+   ->setMessage('Platba objednavky');
+
+// Vrátí EPC řetězec nebo rovnou HTML <img> tag s QR kódem:
+echo $qr->getQRCodeImage();
 ```
 
 ---
