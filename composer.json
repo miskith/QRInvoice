@@ -1,4 +1,5 @@
 {
+	"version": "4.0.0",
 	"name": "miskith/qr-platba",
 	"type": "library",
 	"description": "Generování QR plateb a faktur v PHP.",
