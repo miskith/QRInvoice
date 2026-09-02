@@ -54,6 +54,34 @@ class QRInvoice implements \Stringable
 	public const string SID_VERSION = '1.0';
 
 	/**
+	 * Váhy pro výpočet kontrolního součtu čísla účtu modulo 11.
+	 */
+	private const array MODULO_11_WEIGHTS = [1, 2, 4, 8, 5, 10, 9, 7, 3, 6];
+
+	/**
+	 * Váhy pro výpočet kontrolního součtu předčíslí účtu modulo 11.
+	 */
+	private const array MODULO_11_PREFIX_WEIGHTS = [1, 2, 4, 8, 5, 10];
+
+	/**
+	 * Mapovací tabulka pro rychlé odstranění diakritiky v jednom průchodu.
+	 */
+	private const array DIACRITICS_MAP = [
+		'ě' => 'e', 'š' => 's', 'č' => 'c', 'ř' => 'r', 'ž' => 'z',
+		'ý' => 'y', 'á' => 'a', 'í' => 'i', 'é' => 'e', 'ú' => 'u',
+		'ů' => 'u', 'ó' => 'o', 'ť' => 't', 'ď' => 'd', 'ľ' => 'l',
+		'ň' => 'n', 'ŕ' => 'r', 'â' => 'a', 'ă' => 'a', 'ä' => 'a',
+		'ĺ' => 'l', 'ć' => 'c', 'ç' => 'c', 'ę' => 'e', 'ë' => 'e',
+		'î' => 'i', 'ń' => 'n', 'ô' => 'o', 'ő' => 'o', 'ö' => 'o',
+		'ű' => 'u', 'ü' => 'u',
+		'Ě' => 'E', 'Š' => 'S', 'Č' => 'C', 'Ř' => 'R', 'Ž' => 'Z',
+		'Ý' => 'Y', 'Á' => 'A', 'Í' => 'I', 'É' => 'E', 'Ú' => 'U',
+		'Ů' => 'U', 'Ó' => 'O', 'Ť' => 'T', 'Ď' => 'D', 'Ľ' => 'L',
+		'Ň' => 'N', 'Ä' => 'A', 'Ć' => 'C', 'Ë' => 'E', 'Ö' => 'O',
+		'Ü' => 'U',
+	];
+
+	/**
 	 * @var array<string, string|int|bool|null> klíče QR Platby
 	 */
 	private array $spd_keys = [
@@ -450,6 +478,10 @@ class QRInvoice implements \Stringable
 		}
 
 		$chunks = explode('*', trim($string, '*'));
+		if (count($chunks) < 2) {
+			throw new QRInvoiceException('Invalid QR string format: missing header or version.');
+		}
+
 		$header = array_shift($chunks);
 		array_shift($chunks);
 
@@ -518,7 +550,7 @@ class QRInvoice implements \Stringable
 	private static function parseEpcString(string $string): QRInvoice
 	{
 		$lines = preg_split('/\r\n|\r|\n/', trim($string));
-		if (!isset($lines[0], $lines[3]) || $lines[0] !== 'BCD' || $lines[3] !== 'SCT') {
+		if ($lines === false || !isset($lines[0], $lines[3]) || $lines[0] !== 'BCD' || $lines[3] !== 'SCT') {
 			throw new QRInvoiceException('Invalid SEPA EPC string format.');
 		}
 
@@ -904,7 +936,7 @@ class QRInvoice implements \Stringable
 	{
 		$this->standard = $standard instanceof Standard ? $standard : Standard::from(strtoupper($standard));
 
-		if ($this->standard === Standard::Epc && (in_array($this->spd_keys['CC'], ['CZK', null, ''], true))) {
+		if ($this->standard === Standard::Epc && in_array($this->spd_keys['CC'], ['CZK', null, ''], true)) {
 			$this->spd_keys['CC'] = 'EUR';
 		}
 
@@ -1297,12 +1329,8 @@ class QRInvoice implements \Stringable
 	 */
 	public function addAlternativeAccount(string $account): QRInvoice
 	{
-		if ($this->validateAccount && str_contains($account, '/') && !self::validateCzechAccount($account)) {
-			throw new QRInvoiceException(sprintf('Alternative account number "%s" is not a valid Czech bank account (modulo 11 check failed).', $account));
-		}
-
 		$current = $this->spd_keys['ALT-ACC'] !== null ? explode(',', (string) $this->spd_keys['ALT-ACC']) : [];
-		$current[] = str_contains($account, '/') ? self::accountToIban($account) : $account;
+		$current[] = $account;
 
 		return $this->setAlternativeAccounts($current);
 	}
@@ -1988,7 +2016,7 @@ class QRInvoice implements \Stringable
 		}
 
 		// QR Faktura
-		if (!is_null($this->sid_keys['ID']) && !is_null($this->sid_keys['DD'])) {
+		if ($this->sid_keys['ID'] !== null && $this->sid_keys['DD'] !== null) {
 			$chunks = ['SID', self::SID_VERSION];
 			foreach ($this->sid_keys as $key => $value) {
 				if (
@@ -2121,14 +2149,13 @@ class QRInvoice implements \Stringable
 
 		$prefix = $matches[1];
 		$account = $matches[2];
-		$weights = [1, 2, 4, 8, 5, 10, 9, 7, 3, 6];
 
-		if (!self::checkModulo11($account, $weights)) {
+		if (!self::checkModulo11($account, self::MODULO_11_WEIGHTS)) {
 			return false;
 		}
 
 		if ($prefix !== '' && (int) $prefix !== 0) {
-			if (!self::checkModulo11($prefix, array_slice($weights, 0, 6))) {
+			if (!self::checkModulo11($prefix, self::MODULO_11_PREFIX_WEIGHTS)) {
 				return false;
 			}
 		}
@@ -2187,41 +2214,18 @@ class QRInvoice implements \Stringable
 		}
 
 		$accountPart = sprintf('%06d%010s', (int) $pre, $acc);
-		$iban = $country . '00' . $bank . $accountPart;
+		$countryNumeric = (ord($country[0]) - 55) . (ord($country[1]) - 55);
+		$numericString = $bank . $accountPart . $countryNumeric . '00';
+		$checkDigits = 98 - (int) bcmod($numericString, '97');
 
-		$alfa = range('A', 'Z');
-		$alfa_replace = array_map(strval(...), range(10, 35));
-		$controlegetal = str_replace(
-			$alfa,
-			$alfa_replace,
-			mb_substr($iban, 4, mb_strlen($iban) - 4) . mb_substr($iban, 0, 2) . '00',
-		);
-		$controlegetal = 98 - (int) bcmod($controlegetal, '97');
-
-		return sprintf('%s%02d%04d%06d%010s', $country, $controlegetal, (int) $bank, (int) $pre, $acc);
+		return sprintf('%s%02d%04d%06d%010s', $country, $checkDigits, (int) $bank, (int) $pre, $acc);
 	}
 
 	/**
-	 * Odstranění diaktitiky.
+	 * Odstranění diakritiky v jednom průchodu.
 	 */
 	private function stripDiacritics(string $string): string
 	{
-		return str_replace(
-			[
-				'ě', 'š', 'č', 'ř', 'ž', 'ý', 'á', 'í', 'é', 'ú', 'ů',
-				'ó', 'ť', 'ď', 'ľ', 'ň', 'ŕ', 'â', 'ă', 'ä', 'ĺ', 'ć',
-				'ç', 'ę', 'ë', 'î', 'ń', 'ô', 'ő', 'ö', 'ů', 'ű', 'ü',
-				'Ě', 'Š', 'Č', 'Ř', 'Ž', 'Ý', 'Á', 'Í', 'É', 'Ú', 'Ů',
-				'Ó', 'Ť', 'Ď', 'Ľ', 'Ň', 'Ä', 'Ć', 'Ë', 'Ö', 'Ü',
-			],
-			[
-				'e', 's', 'c', 'r', 'z', 'y', 'a', 'i', 'e', 'u', 'u',
-				'o', 't', 'd', 'l', 'n', 'a', 'a', 'a', 'a', 'a', 'a',
-				'c', 'e', 'e', 'i', 'n', 'o', 'o', 'o', 'u', 'u', 'u',
-				'E', 'S', 'C', 'R', 'Z', 'Y', 'A', 'I', 'E', 'U', 'U',
-				'O', 'T', 'D', 'L', 'N', 'A', 'C', 'E', 'O', 'U',
-			],
-			$string,
-		);
+		return strtr($string, self::DIACRITICS_MAP);
 	}
 }
