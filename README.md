@@ -12,6 +12,10 @@ QR platba zjednodušuje koncovému uživateli provedení příkazu k úhradě v 
 ### Vlastnosti knihovny:
 
 - Generování standardního řetězce **SPAYD 1.0** i integrované či samostatné **QR Faktury** (**SID 1.0**).
+- Podpora pro **okamžité platby** (`PT:IP`).
+- Podpora pro **alternativní účty příjemce** (`ALT-ACC`).
+- Podpora pro **notifikace o platbě** na e-mail (`NT:E`) i SMS (`NT:P`).
+- Doplňující parametry pro systémy výstavce: interní ID dokladu (`X-ID`), URL adresa (`X-URL`), perioda opakování (`X-PER`).
 - Podpora pro výpočet kontrolního součtu **CRC32** z kanonického řetězce dle specifikace ČBA a KDP ČR (`$qrInvoice->setCRC32(true)`).
 - Zobrazení HTML `<img>` tagu obsahujícího rovnou `data-uri` s QR kódem bez nutnosti ukládat soubor na disk (`$qrInvoice->getQRCodeImage()`).
 - Získání čistého `data-uri` řetězce (`$qrInvoice->getQRCodeImage(false)`).
@@ -65,6 +69,35 @@ Lze použít i zkrácený zápis pomocí statického konstruktoru:
 echo QRInvoice::create('12-3456789012/0100', 987.60, '2016001234')
     ->setMessage('QR platba je parádní!')
     ->getQRCodeImage();
+```
+
+---
+
+## Rozšířené možnosti QR platby (standard ČBA SPAYD)
+
+Knihovna plně podporuje veškeré volitelné atributy standardu ČBA:
+
+```php
+$qrInvoice = new QRInvoice()
+    ->setAccount('12-3456789012/0100')
+    ->setAmount(500.00)
+    ->setVariableSymbol('2026001')
+    ->setMessage('Platba objednávky')
+    // Požadavek na okamžitou platbu (převod během několika sekund)
+    ->setInstantPayment(true)
+    // Alternativní účty (např. pro bezplatný převod v rámci stejné banky)
+    ->setAlternativeAccounts(['2501301193/2010', 'CZ5855000000001265098001+RZBCCZPP'])
+    // Notifikace výstavci o odeslání platby na e-mail nebo SMS
+    ->setNotificationEmail('faktury@firma.cz')
+    // ->setNotificationPhone('+420777123456')
+    // Interní identifikátor objednávky/faktury v systému výstavce
+    ->setInternalId('OBJ-2026-001')
+    // Odkaz na detail platby nebo webový portál
+    ->setUrl('https://mojefirma.cz/platba/123')
+    // Perioda opakované platby ve dnech (1 - 30)
+    ->setRepeat(7)
+    // Automatický kontrolní součet integrity
+    ->setCRC32(true);
 ```
 
 ---
@@ -199,7 +232,7 @@ Specifikace ČBA SPAYD a KDP ČR umožňují přidat kontrolní součet `CRC32` 
 // Aktivace automatického výpočtu CRC32
 $qrInvoice->setCRC32(true);
 
-// Získání vypočteného 8místného hexadecimálního kontrolního součtu (např. "68C736E0")
+// Získání vypočteného 8místného hexadecimálního kontrolního součtu (např. "AAD80227")
 $crc = $qrInvoice->getCRC32();
 ```
 

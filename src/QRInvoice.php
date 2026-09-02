@@ -230,6 +230,49 @@ class QRInvoice
 	}
 
 	/**
+	 * Nastavení alternativních účtů příjemce (ALT-ACC).
+	 *
+	 * @param array<int, string> $accounts Pole účtů ve formátu čísla účtu (12-3456789012/0100) nebo IBAN (+BIC)
+	 * @throws QRInvoiceException
+	 */
+	public function setAlternativeAccounts(array $accounts): QRInvoice
+	{
+		if (count($accounts) > 2) {
+			throw new QRInvoiceException('Maximum of 2 alternative accounts is allowed.');
+		}
+
+		if (empty($accounts)) {
+			$this->spd_keys['ALT-ACC'] = null;
+
+			return $this;
+		}
+
+		$ibans = array_map(static fn (string $acc): string => str_contains($acc, '/') ? self::accountToIban($acc) : $acc, $accounts);
+		$altAcc = implode(',', $ibans);
+
+		if (mb_strlen($altAcc) > 93) {
+			throw new QRInvoiceException('ALT-ACC value exceeds maximum length of 93 characters.');
+		}
+
+		$this->spd_keys['ALT-ACC'] = $altAcc;
+
+		return $this;
+	}
+
+	/**
+	 * Přidání alternativního účtu příjemce (ALT-ACC).
+	 *
+	 * @throws QRInvoiceException
+	 */
+	public function addAlternativeAccount(string $account): QRInvoice
+	{
+		$current = $this->spd_keys['ALT-ACC'] !== null ? explode(',', (string) $this->spd_keys['ALT-ACC']) : [];
+		$current[] = str_contains($account, '/') ? self::accountToIban($account) : $account;
+
+		return $this->setAlternativeAccounts($current);
+	}
+
+	/**
 	 * Nastavení částky.
 	 */
 	public function setAmount(int | float $amount): QRInvoice
@@ -300,6 +343,78 @@ class QRInvoice
 	public function setDueDate(DateTime $date): QRInvoice
 	{
 		$this->spd_keys['DT'] = $this->sid_keys['DT'] = $date->format('Ymd');
+
+		return $this;
+	}
+
+	/**
+	 * Požadavek na provedení platby formou okamžité platby (PT:IP).
+	 */
+	public function setInstantPayment(bool $instant = true): QRInvoice
+	{
+		$this->spd_keys['PT'] = $instant ? 'IP' : null;
+
+		return $this;
+	}
+
+	/**
+	 * Nastavení typu platby (PT).
+	 *
+	 * @throws QRInvoiceException
+	 */
+	public function setPaymentType(?string $type): QRInvoice
+	{
+		if ($type !== null && mb_strlen($type) > 3) {
+			throw new QRInvoiceException('Payment type (PT) cannot exceed 3 characters.');
+		}
+
+		$this->spd_keys['PT'] = $type;
+
+		return $this;
+	}
+
+	/**
+	 * Nastavení notifikace výstavci platby přes e-mail (NT:E).
+	 *
+	 * @throws QRInvoiceException
+	 */
+	public function setNotificationEmail(string $email): QRInvoice
+	{
+		if (!filter_var($email, FILTER_VALIDATE_EMAIL) || mb_strlen($email) > 320) {
+			throw new QRInvoiceException(sprintf('Invalid notification email "%s".', $email));
+		}
+
+		$this->spd_keys['NT'] = 'E';
+		$this->spd_keys['NTA'] = $email;
+
+		return $this;
+	}
+
+	/**
+	 * Nastavení notifikace výstavci platby přes SMS/telefon (NT:P).
+	 *
+	 * @throws QRInvoiceException
+	 */
+	public function setNotificationPhone(string $phone): QRInvoice
+	{
+		$cleanPhone = preg_replace('/\s+/', '', $phone) ?? '';
+		if (!preg_match('/^\+?[0-9]{9,15}$/', $cleanPhone) || mb_strlen($cleanPhone) > 320) {
+			throw new QRInvoiceException(sprintf('Invalid notification phone "%s".', $phone));
+		}
+
+		$this->spd_keys['NT'] = 'P';
+		$this->spd_keys['NTA'] = $cleanPhone;
+
+		return $this;
+	}
+
+	/**
+	 * Vymazání nastavení notifikace (NT, NTA).
+	 */
+	public function clearNotification(): QRInvoice
+	{
+		$this->spd_keys['NT'] = null;
+		$this->spd_keys['NTA'] = null;
 
 		return $this;
 	}
@@ -556,6 +671,55 @@ class QRInvoice
 		}
 
 		$this->sid_keys['X-SW'] = $taxSoftware;
+
+		return $this;
+	}
+
+	/**
+	 * Nastavení interního identifikátoru platby v systému výstavce (X-ID).
+	 *
+	 * @throws QRInvoiceException
+	 */
+	public function setInternalId(string $id): QRInvoice
+	{
+		if (mb_strlen($id) > 20) {
+			throw new QRInvoiceException('Internal ID (X-ID) cannot exceed 20 characters.');
+		}
+
+		$this->spd_keys['X-ID'] = $id;
+
+		return $this;
+	}
+
+	/**
+	 * Nastavení URL adresy (X-URL).
+	 *
+	 * @throws QRInvoiceException
+	 */
+	public function setUrl(string $url): QRInvoice
+	{
+		if (mb_strlen($url) > 140) {
+			throw new QRInvoiceException('URL (X-URL) cannot exceed 140 characters.');
+		}
+
+		$this->spd_keys['X-URL'] = $this->sid_keys['X-URL'] = $url;
+
+		return $this;
+	}
+
+	/**
+	 * Nastavení periodicity opakované platby ve dnech (X-PER).
+	 *
+	 * @param int $days Počet dní (1 - 30)
+	 * @throws QRInvoiceException
+	 */
+	public function setRepeat(int $days): QRInvoice
+	{
+		if ($days < 1 || $days > 30) {
+			throw new QRInvoiceException('Repeat period (X-PER) must be between 1 and 30 days.');
+		}
+
+		$this->spd_keys['X-PER'] = (string) $days;
 
 		return $this;
 	}

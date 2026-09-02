@@ -11,6 +11,7 @@
 
 use Endroid\QrCode\QrCode;
 use miskith\QRInvoice\QRInvoice;
+use miskith\QRInvoice\QRInvoiceException;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -241,5 +242,148 @@ class QRPlatbaTest extends TestCase
 
 		$this->assertNotNull($qr->getCrc32());
 		$this->assertSame($qr->getCRC32(), $qr->getCrc32());
+	}
+
+	public function testInstantPayment(): void
+	{
+		$qr = QRInvoice::create('12-3456789012/0100', '1234.56', '2016001234')
+			->setInstantPayment(true);
+
+		$this->assertStringContainsString('*PT:IP', $qr->__toString());
+
+		$qr->setInstantPayment(false);
+		$this->assertStringNotContainsString('PT:IP', $qr->__toString());
+	}
+
+	public function testPaymentTypeCustom(): void
+	{
+		$qr = QRInvoice::create('12-3456789012/0100', '1234.56', '2016001234')
+			->setPaymentType('STD');
+
+		$this->assertStringContainsString('*PT:STD', $qr->__toString());
+	}
+
+	public function testPaymentTypeTooLongThrowsException(): void
+	{
+		$this->expectException(QRInvoiceException::class);
+		$this->expectExceptionMessage('Payment type (PT) cannot exceed 3 characters.');
+
+		new QRInvoice()->setPaymentType('TOOLONG');
+	}
+
+	public function testAlternativeAccounts(): void
+	{
+		$qr = QRInvoice::create('12-3456789012/0100', '1234.56', '2016001234')
+			->setAlternativeAccounts([
+				'CZ5855000000001265098001+RZBCCZPP',
+				'2501301193/2010',
+			]);
+
+		$this->assertStringContainsString('*ALT-ACC:CZ5855000000001265098001+RZBCCZPP,CZ3620100000002501301193', $qr->__toString());
+	}
+
+	public function testAddAlternativeAccount(): void
+	{
+		$qr = QRInvoice::create('12-3456789012/0100', '1234.56', '2016001234')
+			->addAlternativeAccount('CZ5855000000001265098001+RZBCCZPP')
+			->addAlternativeAccount('2501301193/2010');
+
+		$this->assertStringContainsString('*ALT-ACC:CZ5855000000001265098001+RZBCCZPP,CZ3620100000002501301193', $qr->__toString());
+	}
+
+	public function testAlternativeAccountsTooManyThrowsException(): void
+	{
+		$this->expectException(QRInvoiceException::class);
+		$this->expectExceptionMessage('Maximum of 2 alternative accounts is allowed.');
+
+		new QRInvoice()->setAlternativeAccounts([
+			'CZ5855000000001265098001',
+			'CZ0920100000002501301193',
+			'CZ0301000000123456789012',
+		]);
+	}
+
+	public function testNotificationEmail(): void
+	{
+		$qr = QRInvoice::create('12-3456789012/0100', '1234.56', '2016001234')
+			->setNotificationEmail('faktury@firma.cz');
+
+		$this->assertStringContainsString('*NT:E*NTA:faktury@firma.cz', $qr->__toString());
+
+		$qr->clearNotification();
+		$this->assertStringNotContainsString('NT:E', $qr->__toString());
+		$this->assertStringNotContainsString('NTA:', $qr->__toString());
+	}
+
+	public function testNotificationEmailInvalidThrowsException(): void
+	{
+		$this->expectException(QRInvoiceException::class);
+		$this->expectExceptionMessage('Invalid notification email "invalid-email".');
+
+		new QRInvoice()->setNotificationEmail('invalid-email');
+	}
+
+	public function testNotificationPhone(): void
+	{
+		$qr = QRInvoice::create('12-3456789012/0100', '1234.56', '2016001234')
+			->setNotificationPhone('+420 123 456 789');
+
+		$this->assertStringContainsString('*NT:P*NTA:+420123456789', $qr->__toString());
+	}
+
+	public function testNotificationPhoneInvalidThrowsException(): void
+	{
+		$this->expectException(QRInvoiceException::class);
+		$this->expectExceptionMessage('Invalid notification phone "abc".');
+
+		new QRInvoice()->setNotificationPhone('abc');
+	}
+
+	public function testInternalId(): void
+	{
+		$qr = QRInvoice::create('12-3456789012/0100', '1234.56', '2016001234')
+			->setInternalId('ORDER-12345');
+
+		$this->assertStringContainsString('*X-ID:ORDER-12345', $qr->__toString());
+	}
+
+	public function testInternalIdTooLongThrowsException(): void
+	{
+		$this->expectException(QRInvoiceException::class);
+		$this->expectExceptionMessage('Internal ID (X-ID) cannot exceed 20 characters.');
+
+		new QRInvoice()->setInternalId('123456789012345678901');
+	}
+
+	public function testUrl(): void
+	{
+		$qr = QRInvoice::create('12-3456789012/0100', '1234.56', '2016001234')
+			->setUrl('https://example.com/pay');
+
+		$this->assertStringContainsString('*X-URL:https://example.com/pay', $qr->__toString());
+	}
+
+	public function testUrlTooLongThrowsException(): void
+	{
+		$this->expectException(QRInvoiceException::class);
+		$this->expectExceptionMessage('URL (X-URL) cannot exceed 140 characters.');
+
+		new QRInvoice()->setUrl(str_repeat('a', 141));
+	}
+
+	public function testRepeat(): void
+	{
+		$qr = QRInvoice::create('12-3456789012/0100', '1234.56', '2016001234')
+			->setRepeat(7);
+
+		$this->assertStringContainsString('*X-PER:7', $qr->__toString());
+	}
+
+	public function testRepeatInvalidThrowsException(): void
+	{
+		$this->expectException(QRInvoiceException::class);
+		$this->expectExceptionMessage('Repeat period (X-PER) must be between 1 and 30 days.');
+
+		new QRInvoice()->setRepeat(31);
 	}
 }
