@@ -841,4 +841,134 @@ class QRPlatbaTest extends TestCase
 		$this->assertStringContainsString('X-VS:20260055', $str); // Automaticky extrahováno z čísla faktury
 		$this->assertStringContainsString('X-INV:', $str);
 	}
+
+	public function testParseSpaydStringRoundtrip(): void
+	{
+		$original = new QRInvoice();
+		$original->setAccount('27-16060243/0300')
+			->setAmount(1499.90)
+			->setCurrency(Currency::CZK)
+			->setVariableSymbol('2026105')
+			->setConstantSymbol('0308')
+			->setSpecificSymbol('5544')
+			->setMessage('Platba za objednavku')
+			->setRecipientName('Firma s.r.o.')
+			->setDueDate(new DateTime('2026-12-15'))
+			->setInstantPayment(true)
+			->setNotificationEmail('notifikace@firma.cz')
+			->setInternalId('INT-99')
+			->setUrl('https://firma.cz/platba')
+			->setRepeat(5);
+
+		$string = (string) $original;
+		$parsed = QRInvoice::fromString($string);
+
+		$this->assertSame($original->getAccount(), $parsed->getAccount());
+		$this->assertSame(1499.90, $parsed->getAmount());
+		$this->assertSame(Currency::CZK, $parsed->getCurrency());
+		$this->assertSame('CZK', $parsed->getCurrencyString());
+		$this->assertSame('2026105', $parsed->getVariableSymbol());
+		$this->assertSame('0308', $parsed->getConstantSymbol());
+		$this->assertSame('5544', $parsed->getSpecificSymbol());
+		$this->assertSame('Platba za objednavku', $parsed->getMessage());
+		$this->assertSame('Firma s.r.o.', $parsed->getRecipientName());
+		$this->assertSame('2026-12-15', $parsed->getDueDate()?->format('Y-m-d'));
+		$this->assertTrue($parsed->isInstantPayment());
+		$this->assertSame(PaymentType::Instant, $parsed->getPaymentType());
+		$this->assertSame('notifikace@firma.cz', $parsed->getNotificationEmail());
+		$this->assertSame('INT-99', $parsed->getInternalId());
+		$this->assertSame('https://firma.cz/platba', $parsed->getUrl());
+		$this->assertSame(5, $parsed->getRepeat());
+
+		// Porovnání vygenerovaného výstupu
+		$this->assertSame($string, (string) $parsed);
+	}
+
+	public function testParseSpaydWithCRC32AndVerification(): void
+	{
+		$original = QRInvoice::create('27-16060243/0300', 500.00, '2026001', Currency::CZK)
+			->setMessage('Test CRC')
+			->setCRC32(true);
+
+		$validStr = (string) $original;
+		$parsedValid = QRInvoice::fromString($validStr);
+
+		$this->assertNotNull($parsedValid->getParsedCRC32());
+		$this->assertTrue($parsedValid->verifyCRC32());
+
+		// Simulace podvrženého/změněného řetězce (změna částky bez přepočtení CRC32)
+		$corruptedStr = str_replace('AM:500.00', 'AM:9999.00', $validStr);
+		$parsedCorrupted = QRInvoice::fromString($corruptedStr);
+
+		$this->assertFalse($parsedCorrupted->verifyCRC32());
+	}
+
+	public function testParseIntegratedInvoiceXInv(): void
+	{
+		$invoice = QRInvoice::createTaxInvoice('27-16060243/0300', 2420.00, 'VF2026001', new DateTime('2026-12-31'), new DateTime('2026-12-01'))
+			->setTaxDate(new DateTime('2026-12-01'))
+			->setCompanyTaxId('CZ60194383')
+			->setCompanyRegistrationId('60194383');
+
+		$str = (string) $invoice;
+		$parsed = QRInvoice::fromString($str);
+
+		$this->assertSame('VF2026001', $parsed->getInvoiceId());
+		$this->assertSame('2026-12-01', $parsed->getInvoiceDate()?->format('Y-m-d'));
+		$this->assertSame('2026-12-01', $parsed->getTaxDate()?->format('Y-m-d'));
+		$this->assertSame('2026-12-31', $parsed->getDueDate()?->format('Y-m-d'));
+		$this->assertSame('CZ60194383', $parsed->getCompanyTaxId());
+		$this->assertSame('60194383', $parsed->getCompanyRegistrationId());
+		$this->assertSame(2420.00, $parsed->getAmount());
+	}
+
+	public function testParseStandaloneInvoiceSid(): void
+	{
+		$invoice = new QRInvoice();
+		$invoice->setIsOnlyInvoice(true)
+			->setInvoiceId('FV-123')
+			->setInvoiceDate(new DateTime('2026-11-15'))
+			->setAmount(800.00);
+
+		$str = (string) $invoice;
+		$this->assertStringStartsWith('SID*1.0*', $str);
+
+		$parsed = QRInvoice::fromString($str);
+		$this->assertTrue($parsed->isOnlyInvoice());
+		$this->assertSame('FV-123', $parsed->getInvoiceId());
+		$this->assertSame('2026-11-15', $parsed->getInvoiceDate()?->format('Y-m-d'));
+		$this->assertSame(800.00, $parsed->getAmount());
+	}
+
+	public function testParseEpcString(): void
+	{
+		$epc = QRInvoice::createEpc(
+			'SK6702000000001234567890',
+			'EuroCorp s.r.o.',
+			345.50,
+			'Platba faktury',
+			'SUBAASKBX',
+			'2026009',
+		);
+
+		$str = (string) $epc;
+		$parsed = QRInvoice::fromString($str);
+
+		$this->assertSame(Standard::Epc, $parsed->getStandard());
+		$this->assertSame('SK6702000000001234567890', $parsed->getIban());
+		$this->assertSame('EuroCorp s.r.o.', $parsed->getRecipientName());
+		$this->assertSame(345.50, $parsed->getAmount());
+		$this->assertSame(Currency::EUR, $parsed->getCurrency());
+		$this->assertSame('SUBAASKBX', $parsed->getBic());
+		$this->assertSame('2026009', $parsed->getVariableSymbol());
+		$this->assertSame('Platba faktury', $parsed->getMessage());
+	}
+
+	public function testFromStringThrowsOnInvalidString(): void
+	{
+		$this->expectException(QRInvoiceException::class);
+		$this->expectExceptionMessage('Unsupported or invalid QR string format');
+
+		QRInvoice::fromString('INVALID_RANDOM_TEXT');
+	}
 }

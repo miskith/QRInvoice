@@ -228,6 +228,11 @@ class QRInvoice
 	private ?ColorInterface $backgroundColor = null;
 
 	/**
+	 * Původní hodnota CRC32 načtená z textového řetězce (pokud byla přítomna).
+	 */
+	private ?string $parsedCrc32 = null;
+
+	/**
 	 * Konstruktor nové platby.
 	 *
 	 * @throws \InvalidArgumentException
@@ -427,6 +432,435 @@ class QRInvoice
 		}
 
 		return $qr;
+	}
+
+	/**
+	 * Načte a rozparsuje textový řetězec QR Platby (SPAYD), QR Faktury (SID) nebo SEPA EPC QR platby.
+	 *
+	 * @throws QRInvoiceException
+	 */
+	public static function fromString(string $string): QRInvoice
+	{
+		$string = trim($string);
+
+		if (str_starts_with($string, 'BCD')) {
+			return self::parseEpcString($string);
+		}
+
+		if (str_starts_with($string, 'SPD*') || str_starts_with($string, 'SID*')) {
+			return self::parseSpaydString($string);
+		}
+
+		throw new QRInvoiceException('Unsupported or invalid QR string format. Expected SPAYD, SID or EPC string.');
+	}
+
+	/**
+	 * Parsování SPAYD nebo SID řetězce.
+	 *
+	 * @throws QRInvoiceException
+	 */
+	private static function parseSpaydString(string $string): QRInvoice
+	{
+		$qr = new self();
+		$isOnlyInvoice = str_starts_with($string, 'SID*');
+		if ($isOnlyInvoice) {
+			$qr->setIsOnlyInvoice(true);
+		}
+
+		$chunks = explode('*', trim($string, '*'));
+		$header = array_shift($chunks);
+		$version = array_shift($chunks);
+
+		if (!in_array($header, ['SPD', 'SID'], true)) {
+			throw new QRInvoiceException(sprintf('Invalid format header "%s". Expected SPD or SID.', $header));
+		}
+
+		foreach ($chunks as $chunk) {
+			if ($chunk === '' || !str_contains($chunk, ':')) {
+				continue;
+			}
+
+			[$key, $value] = explode(':', $chunk, 2);
+
+			if ($key === 'CRC32') {
+				$qr->parsedCrc32 = $value;
+				if ($isOnlyInvoice) {
+					$qr->sid_keys['CRC32'] = true;
+				} else {
+					$qr->spd_keys['CRC32'] = true;
+				}
+				continue;
+			}
+
+			if ($key === 'X-INV') {
+				$invString = str_replace('%2A', '*', $value);
+				$invChunks = explode('*', trim($invString, '*'));
+				array_shift($invChunks); // SID
+				array_shift($invChunks); // 1.0
+
+				foreach ($invChunks as $invChunk) {
+					if ($invChunk === '' || !str_contains($invChunk, ':')) {
+						continue;
+					}
+					[$invKey, $invVal] = explode(':', $invChunk, 2);
+					if ($invKey === 'CRC32') {
+						$qr->sid_keys['CRC32'] = true;
+					} else {
+						$qr->sid_keys[$invKey] = $invVal;
+					}
+				}
+				continue;
+			}
+
+			if ($isOnlyInvoice) {
+				$qr->sid_keys[$key] = $value;
+			} else {
+				$qr->spd_keys[$key] = $value;
+				if ($key === 'ACC') {
+					$qr->sid_keys['ACC'] = $value;
+				}
+			}
+		}
+
+		return $qr;
+	}
+
+	/**
+	 * Parsování řetězce SEPA EPC QR platby (EPC069-12).
+	 *
+	 * @throws QRInvoiceException
+	 */
+	private static function parseEpcString(string $string): QRInvoice
+	{
+		$lines = preg_split('/\r\n|\r|\n/', trim($string));
+		if (!isset($lines[0], $lines[3]) || $lines[0] !== 'BCD' || $lines[3] !== 'SCT') {
+			throw new QRInvoiceException('Invalid SEPA EPC string format.');
+		}
+
+		$qr = new self();
+		$qr->setStandard(Standard::Epc);
+
+		$bic = $lines[4] ?? '';
+		if ($bic !== '') {
+			$qr->setBic($bic);
+		}
+
+		$recipientName = $lines[5] ?? '';
+		if ($recipientName !== '') {
+			$qr->setRecipientName($recipientName);
+		}
+
+		$iban = $lines[6] ?? '';
+		if ($iban !== '') {
+			$qr->setIban($iban);
+		}
+
+		$amountStr = $lines[7] ?? '';
+		if ($amountStr !== '') {
+			if (str_starts_with($amountStr, 'EUR')) {
+				$amount = (float) substr($amountStr, 3);
+				$qr->setAmount($amount);
+				$qr->setCurrency(Currency::EUR);
+			} else {
+				$qr->setAmount((float) $amountStr);
+			}
+		}
+
+		$purpose = $lines[8] ?? '';
+		if ($purpose !== '') {
+			$qr->setPurpose($purpose);
+		}
+
+		$reference = $lines[9] ?? '';
+		if ($reference !== '') {
+			$qr->setRemittanceReference($reference);
+		}
+
+		$unstructured = $lines[10] ?? '';
+		if ($unstructured !== '') {
+			if (preg_match('/^VS:([0-9]{1,10})\s*(.*)$/', $unstructured, $matches)) {
+				$qr->setVariableSymbol($matches[1]);
+				if ($matches[2] !== '') {
+					$qr->setMessage($matches[2]);
+				}
+			} else {
+				$qr->setMessage($unstructured);
+			}
+		}
+
+		return $qr;
+	}
+
+	/**
+	 * Ověření kontrolního součtu CRC32 z parsovaného řetězce.
+	 *
+	 * @return bool|null true pokud kontrolní součet odpovídá, false pokud je chybný, null pokud CRC32 v řetězci chybí
+	 */
+	public function verifyCRC32(): ?bool
+	{
+		if ($this->parsedCrc32 === null) {
+			return null;
+		}
+
+		$calculated = $this->getCRC32();
+
+		return $calculated !== null && strtoupper($this->parsedCrc32) === strtoupper($calculated);
+	}
+
+	/**
+	 * Původní hodnota CRC32 načtená z řetězce (pokud byla přítomna).
+	 */
+	public function getParsedCRC32(): ?string
+	{
+		return $this->parsedCrc32;
+	}
+
+	/**
+	 * Získání čísla účtu / IBAN příjemce.
+	 */
+	public function getAccount(): ?string
+	{
+		return $this->spd_keys['ACC'] ?? $this->sid_keys['ACC'] ?? null;
+	}
+
+	/**
+	 * Získání IBAN čísla účtu příjemce.
+	 */
+	public function getIban(): ?string
+	{
+		return $this->getAccount();
+	}
+
+	/**
+	 * Získání částky platby.
+	 */
+	public function getAmount(): ?float
+	{
+		if ($this->spd_keys['AM'] !== null) {
+			return (float) $this->spd_keys['AM'];
+		}
+
+		if ($this->sid_keys['AM'] !== null) {
+			return (float) $this->sid_keys['AM'];
+		}
+
+		return null;
+	}
+
+	/**
+	 * Získání měny platby jako Currency Enum.
+	 */
+	public function getCurrency(): ?Currency
+	{
+		$cc = $this->getCurrencyString();
+
+		return $cc !== null ? Currency::tryFrom($cc) : null;
+	}
+
+	/**
+	 * Získání 3znakového kódu měny (např. "CZK", "EUR").
+	 */
+	public function getCurrencyString(): ?string
+	{
+		return $this->spd_keys['CC'] ?? $this->sid_keys['CC'] ?? null;
+	}
+
+	/**
+	 * Získání variabilního symbolu platby.
+	 */
+	public function getVariableSymbol(): ?string
+	{
+		return $this->spd_keys['X-VS'] ?? $this->sid_keys['VS'] ?? null;
+	}
+
+	/**
+	 * Získání konstantního symbolu platby.
+	 */
+	public function getConstantSymbol(): ?string
+	{
+		return $this->spd_keys['X-KS'] ?? null;
+	}
+
+	/**
+	 * Získání specifického symbolu platby.
+	 */
+	public function getSpecificSymbol(): ?string
+	{
+		return $this->spd_keys['X-SS'] ?? null;
+	}
+
+	/**
+	 * Získání zprávy pro příjemce.
+	 */
+	public function getMessage(): ?string
+	{
+		return $this->spd_keys['MSG'] ?? $this->sid_keys['MSG'] ?? null;
+	}
+
+	/**
+	 * Získání jména příjemce.
+	 */
+	public function getRecipientName(): ?string
+	{
+		return $this->spd_keys['RN'] ?? null;
+	}
+
+	/**
+	 * Získání data splatnosti platby.
+	 */
+	public function getDueDate(): ?DateTime
+	{
+		$dt = $this->spd_keys['DT'] ?? $this->sid_keys['DT'] ?? null;
+
+		return $dt !== null ? DateTime::createFromFormat('Ymd', $dt) ?: null : null;
+	}
+
+	/**
+	 * Získání typu platby jako PaymentType Enum.
+	 */
+	public function getPaymentType(): ?PaymentType
+	{
+		$pt = $this->spd_keys['PT'] ?? null;
+
+		return $pt !== null ? PaymentType::tryFrom($pt) : null;
+	}
+
+	/**
+	 * Zjistí, zda je platba označena jako okamžitá (Instant Payment).
+	 */
+	public function isInstantPayment(): bool
+	{
+		return ($this->spd_keys['PT'] ?? null) === PaymentType::Instant->value;
+	}
+
+	/**
+	 * Získání e-mailové adresy pro notifikaci o platbě.
+	 */
+	public function getNotificationEmail(): ?string
+	{
+		return ($this->spd_keys['NT'] ?? null) === 'E' ? ($this->spd_keys['NTA'] ?? null) : null;
+	}
+
+	/**
+	 * Získání telefonního čísla pro notifikaci o platbě.
+	 */
+	public function getNotificationPhone(): ?string
+	{
+		return ($this->spd_keys['NT'] ?? null) === 'P' ? ($this->spd_keys['NTA'] ?? null) : null;
+	}
+
+	/**
+	 * Získání interního ID platby na straně příkazce.
+	 */
+	public function getInternalId(): ?string
+	{
+		return $this->spd_keys['X-ID'] ?? null;
+	}
+
+	/**
+	 * Získání URL odkazu platby.
+	 */
+	public function getUrl(): ?string
+	{
+		return $this->spd_keys['X-URL'] ?? null;
+	}
+
+	/**
+	 * Získání periody opakování platby ve dnech.
+	 */
+	public function getRepeat(): ?int
+	{
+		return $this->spd_keys['X-PER'] !== null ? (int) $this->spd_keys['X-PER'] : null;
+	}
+
+	/**
+	 * Získání seznamu alternativních účtů.
+	 *
+	 * @return array<string>
+	 */
+	public function getAlternativeAccounts(): array
+	{
+		return $this->spd_keys['ALT-ACC'] !== null ? explode(',', (string) $this->spd_keys['ALT-ACC']) : [];
+	}
+
+	/**
+	 * Získání čísla faktury / označení dokladu.
+	 */
+	public function getInvoiceId(): ?string
+	{
+		return $this->sid_keys['ID'] ?? null;
+	}
+
+	/**
+	 * Získání data vystavení faktury.
+	 */
+	public function getInvoiceDate(): ?DateTime
+	{
+		$dd = $this->sid_keys['DD'] ?? null;
+
+		return $dd !== null ? DateTime::createFromFormat('Ymd', $dd) ?: null : null;
+	}
+
+	/**
+	 * Získání data uskutečnění zdanitelného plnění (DUZP).
+	 */
+	public function getTaxDate(): ?DateTime
+	{
+		$duzp = $this->sid_keys['DUZP'] ?? null;
+
+		return $duzp !== null ? DateTime::createFromFormat('Ymd', $duzp) ?: null : null;
+	}
+
+	/**
+	 * Získání typu dokladu jako InvoiceDocumentType Enum.
+	 */
+	public function getInvoiceDocumentType(): ?InvoiceDocumentType
+	{
+		$td = $this->sid_keys['TD'] ?? null;
+
+		return $td !== null ? InvoiceDocumentType::tryFrom($td) : null;
+	}
+
+	/**
+	 * Získání typu daňového plnění jako TaxPerformance Enum.
+	 */
+	public function getTaxPerformance(): ?TaxPerformance
+	{
+		$tp = $this->sid_keys['TP'] ?? null;
+
+		return $tp !== null ? TaxPerformance::tryFrom((int) $tp) : null;
+	}
+
+	/**
+	 * Získání DIČ výstavce.
+	 */
+	public function getCompanyTaxId(): ?string
+	{
+		return $this->sid_keys['VII'] ?? null;
+	}
+
+	/**
+	 * Získání IČO výstavce.
+	 */
+	public function getCompanyRegistrationId(): ?string
+	{
+		return $this->sid_keys['INI'] ?? null;
+	}
+
+	/**
+	 * Získání DIČ příjemce faktury.
+	 */
+	public function getInvoiceSubjectTaxId(): ?string
+	{
+		return $this->sid_keys['VIR'] ?? null;
+	}
+
+	/**
+	 * Získání IČO příjemce faktury.
+	 */
+	public function getInvoiceSubjectRegistrationId(): ?string
+	{
+		return $this->sid_keys['INR'] ?? null;
 	}
 
 	/**
@@ -1017,6 +1451,14 @@ class QRInvoice
 		$this->isOnlyInvoice = $isOnlyInvoice;
 
 		return $this;
+	}
+
+	/**
+	 * Zjistí, zda se generuje pouze QR Faktura.
+	 */
+	public function isOnlyInvoice(): bool
+	{
+		return $this->isOnlyInvoice;
 	}
 
 	/**

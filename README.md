@@ -22,6 +22,7 @@ QR platba zjednodušuje koncovému uživateli provedení příkazu k úhradě v 
 - Zobrazení HTML `<img>` tagu obsahujícího rovnou `data-uri` s QR kódem bez nutnosti ukládat soubor na disk (`$qrInvoice->getQRCodeImage()`).
 - Získání čistého `data-uri` řetězce (`$qrInvoice->getQRCodeImage(false)`).
 - Přímé vrácení čistého vektorového **SVG řetězce** pro inline vložení do šablon (HTML, Latte, Blade, Twig) bez nutnosti ukládat na disk (`$qrInvoice->getSvg()`).
+- **Čtení a parsování QR plateb** (`QRInvoice::fromString`): načtení SPAYD, QR Faktury i SEPA EPC řetězců zpět do objektu včetně ověření integrity **CRC32** (`verifyCRC32`).
 - Uložení do souboru v široké škále formátů: **PNG, SVG, PDF, EPS, WebP, GIF, binární** (`$qrInvoice->saveQRCodeImage()`).
 - Získání instance objektu [Endroid\QrCode\QrCode](https://github.com/endroid/qr-code) pro pokročilé úpravy (`$qrInvoice->getQRCodeInstance()`).
 - Vložení loga do středu QR kódu: oficiální logo ČBA „QR Platba“ (`withDefaultLogo`) i libovolné vlastní firemní logo (`setLogo`).
@@ -405,6 +406,38 @@ $inlineSvg = $qrInvoice->getSvg(excludeXmlDeclaration: true);
 ```php
 $spaydString = (string) $qrInvoice;
 // např. "SPD*1.0*ACC:CZ3103000000270016060243*AM:1234.50*CC:CZK*X-VS:2016001234"
+```
+
+---
+
+## Čtení a parsování QR plateb (Reader)
+
+Knihovna dokáže nejen QR kódy generovat, ale také načítat a parsovat existující textové řetězce (ze skeneru, čtečky, webhooku či PDF faktury) zpět do plně typovaného objektu `QRInvoice`.
+
+Podporovány jsou formáty **SPAYD** (tuzemská QR Platba), **SID** (samostatná QR Faktura), integrovaná **QR Faktura+Platba** (`X-INV`) i evropský **SEPA EPC QR kód**:
+
+```php
+use miskith\QRInvoice\QRInvoice;
+
+// 1. Načtení SPAYD řetězce:
+$qr = QRInvoice::fromString('SPD*1.0*ACC:CZ3103000000270016060243*AM:1500.50*CC:CZK*X-VS:2026001*MSG:Platba za sluzby*CRC32:1018593E');
+
+echo $qr->getAmount();           // 1500.5
+echo $qr->getCurrencyString();   // "CZK"
+echo $qr->getVariableSymbol();   // "2026001"
+echo $qr->getMessage();          // "Platba za sluzby"
+echo $qr->getAccount();          // "CZ3103000000270016060243"
+
+// Ověření integrity dat (zda nebyla částka nebo účet podvržen):
+if ($qr->verifyCRC32() === false) {
+    throw new \Exception('Varování: Kontrolní součet CRC32 nesouhlasí, data byla změněna!');
+}
+
+// 2. Načtení evropského SEPA EPC řetězce:
+$epc = QRInvoice::fromString($epcText);
+echo $epc->getRecipientName();   // "Firma s.r.o."
+echo $epc->getIban();            // "SK6702000000001234567890"
+echo $epc->getBic();             // "SUBAASKBX"
 ```
 
 ---
