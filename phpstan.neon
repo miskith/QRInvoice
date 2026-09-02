@@ -9,6 +9,9 @@ parameters:
         - src
         - Tests
 
+    strictRules:
+        dynamicCallOnStaticMethod: false
+
     checkMissingCallableSignature: true
     checkUninitializedProperties: true
     rememberPossiblyImpureFunctionValues: true
