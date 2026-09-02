@@ -32,8 +32,8 @@ QR platba zjednodušuje koncovému uživateli provedení příkazu k úhradě v 
 - Podpora pro měnu CZK i ostatní světové měny dle ISO 4217 pomocí `setCurrency(Currency::CZK)`.
 
 > [!TIP]
-> **Doporučení pro typovost (PHP 8.4 Enums):**  
-> V PHP 8.4 důrazně doporučujeme používat nativní Enumy (`Format`, `Currency`, `PaymentType`, `InvoiceDocumentType`, `TaxPerformance`).  
+> **Doporučení pro typovost (PHP 8.4 Enums):**
+> V PHP 8.4 důrazně doporučujeme používat nativní Enumy (`Format`, `Currency`, `PaymentType`, `InvoiceDocumentType`, `TaxPerformance`).
 > Předávání skalárních řetězců a celých čísel (např. `'png'`, `'CZK'`, `0`) je z důvodu zachování zpětné kompatibility stále podporováno, ale je označeno jako **deprecated** a v budoucí verzi knihovny bude odstraněno.
 
 QR Platbu dnes podporují prakticky všechny tuzemské banky (např. Air Bank, Česká spořitelna, ČSOB, Fio banka, Komerční banka, mBank, MONETA Money Bank, Raiffeisenbank, UniCredit Bank, Banka Creditas a další).
@@ -460,6 +460,7 @@ Kontrolní součet je počítán algoritmem IEEE 802.3 přes kanonickou podobu �
 
 ## Odkazy
 
+- [Dokumentace](https://storage.davidmyska.com/qr-invoice/)
 - [Oficiální specifikace formátu QR Platba (ČBA)](https://qr-platba.cz/pro-vyvojare/specifikace-formatu/)
 - [Oficiální web QR Faktury](https://qr-faktura.cz/)
 - [Originální projekt na GitHubu](https://github.com/dfridrich/QRPlatba)
