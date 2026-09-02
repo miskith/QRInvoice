@@ -31,7 +31,8 @@
 	},
 	"require-dev": {
 		"phpunit/phpunit": "^13.3.2",
-		"friendsofphp/php-cs-fixer": "^3.95"
+		"friendsofphp/php-cs-fixer": "^3.95",
+		"rector/rector": "^2.6.6"
 	},
 	"scripts": {
 		"psr-fix": [
@@ -39,6 +40,12 @@
 		],
 		"test": [
 			"./vendor/bin/phpunit"
+		],
+		"rector": [
+			"rector process"
+		],
+		"rector-dry": [
+			"rector process --dry-run"
 		],
 		"generate-docs": [
 			"php /usr/local/bin/phpDocumentor -d ./src -t docs"
