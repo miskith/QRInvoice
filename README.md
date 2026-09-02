@@ -147,7 +147,7 @@ echo $qrInvoice->getQRCodeImage(false);
 
 ## Odkazy
 
-- Dokumentace - https://www.davidmyska.com/qr-invoice/
+- Dokumentace - https://storage.davidmyska.com/qr-invoice/
 - Oficiální web QR Platby - https://qr-platba.cz/
 - Oficiální web QR Faktury - https://qr-faktura.cz/
 - Originální projekt - https://github.com/dfridrich/QRPlatba
